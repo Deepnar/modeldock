@@ -1,0 +1,265 @@
+{
+  "version": 1,
+  "_note": "Bundled offline fallback catalog. Sizes are approximate defaults for the Q4_K_M quantizations Ollama serves and are indicative only; the live ollama.com catalog is authoritative when reachable.",
+  "models": [
+    {
+      "name": "llama3",
+      "aliases": ["llama-3", "llama3-8b"],
+      "category": "chat",
+      "capabilities": ["chat", "completion"],
+      "default_tag": "latest",
+      "description": "Meta Llama 3 — general-purpose open chat model.",
+      "backend_hints": ["ollama"],
+      "variants": [
+        { "tag": "latest", "params": "8B", "size_bytes": 4700000000, "min_ram": "8GB" },
+        { "tag": "8b", "params": "8B", "size_bytes": 4700000000, "min_ram": "8GB" },
+        { "tag": "70b", "params": "70B", "size_bytes": 40000000000, "min_ram": "48GB" }
+      ]
+    },
+    {
+      "name": "llama3.1",
+      "aliases": ["llama-3.1"],
+      "category": "chat",
+      "capabilities": ["chat", "completion", "tool_use"],
+      "default_tag": "latest",
+      "description": "Meta Llama 3.1 — longer context and tool-calling support.",
+      "backend_hints": ["ollama"],
+      "variants": [
+        { "tag": "latest", "params": "8B", "size_bytes": 4900000000, "min_ram": "8GB" },
+        { "tag": "8b", "params": "8B", "size_bytes": 4900000000, "min_ram": "8GB" },
+        { "tag": "70b", "params": "70B", "size_bytes": 42000000000, "min_ram": "48GB" }
+      ]
+    },
+    {
+      "name": "llama3.2",
+      "aliases": ["llama-3.2"],
+      "category": "chat",
+      "capabilities": ["chat", "completion", "tool_use"],
+      "default_tag": "latest",
+      "description": "Meta Llama 3.2 — small, efficient chat models for edge and laptop use.",
+      "backend_hints": ["ollama"],
+      "variants": [
+        { "tag": "latest", "params": "3B", "size_bytes": 2000000000, "min_ram": "4GB" },
+        { "tag": "1b", "params": "1B", "size_bytes": 1300000000, "min_ram": "3GB" },
+        { "tag": "3b", "params": "3B", "size_bytes": 2000000000, "min_ram": "4GB" }
+      ]
+    },
+    {
+      "name": "qwen3",
+      "aliases": ["qwen-3"],
+      "category": "chat",
+      "capabilities": ["chat", "completion", "reasoning", "tool_use"],
+      "default_tag": "latest",
+      "description": "Alibaba Qwen3 — multilingual chat model with a thinking mode.",
+      "backend_hints": ["ollama"],
+      "variants": [
+        { "tag": "latest", "params": "8B", "size_bytes": 5200000000, "min_ram": "8GB" },
+        { "tag": "4b", "params": "4B", "size_bytes": 2600000000, "min_ram": "6GB" },
+        { "tag": "8b", "params": "8B", "size_bytes": 5200000000, "min_ram": "8GB" },
+        { "tag": "14b", "params": "14B", "size_bytes": 9300000000, "min_ram": "16GB" }
+      ]
+    },
+    {
+      "name": "qwen2.5",
+      "aliases": ["qwen-2.5"],
+      "category": "chat",
+      "capabilities": ["chat", "completion", "tool_use"],
+      "default_tag": "latest",
+      "description": "Alibaba Qwen2.5 — general-purpose multilingual chat model.",
+      "backend_hints": ["ollama"],
+      "variants": [
+        { "tag": "latest", "params": "7B", "size_bytes": 4700000000, "min_ram": "8GB" },
+        { "tag": "7b", "params": "7B", "size_bytes": 4700000000, "min_ram": "8GB" },
+        { "tag": "32b", "params": "32B", "size_bytes": 20000000000, "min_ram": "32GB" }
+      ]
+    },
+    {
+      "name": "mistral",
+      "aliases": ["mistral-7b"],
+      "category": "chat",
+      "capabilities": ["chat", "completion", "tool_use"],
+      "default_tag": "latest",
+      "description": "Mistral 7B — fast, compact general-purpose chat model.",
+      "backend_hints": ["ollama"],
+      "variants": [
+        { "tag": "latest", "params": "7B", "size_bytes": 4100000000, "min_ram": "8GB" },
+        { "tag": "7b", "params": "7B", "size_bytes": 4100000000, "min_ram": "8GB" }
+      ]
+    },
+    {
+      "name": "gemma3",
+      "aliases": ["gemma-3"],
+      "category": "chat",
+      "capabilities": ["chat", "completion", "vision"],
+      "default_tag": "latest",
+      "description": "Google Gemma 3 — lightweight open models with image input on larger sizes.",
+      "backend_hints": ["ollama"],
+      "variants": [
+        { "tag": "latest", "params": "4B", "size_bytes": 3300000000, "min_ram": "6GB" },
+        { "tag": "1b", "params": "1B", "size_bytes": 800000000, "min_ram": "2GB" },
+        { "tag": "4b", "params": "4B", "size_bytes": 3300000000, "min_ram": "6GB" },
+        { "tag": "12b", "params": "12B", "size_bytes": 8100000000, "min_ram": "16GB" }
+      ]
+    },
+    {
+      "name": "phi4",
+      "aliases": ["phi-4"],
+      "category": "chat",
+      "capabilities": ["chat", "completion", "reasoning"],
+      "default_tag": "latest",
+      "description": "Microsoft Phi-4 — small model with strong reasoning for its size.",
+      "backend_hints": ["ollama"],
+      "variants": [
+        { "tag": "latest", "params": "14B", "size_bytes": 9100000000, "min_ram": "16GB" },
+        { "tag": "14b", "params": "14B", "size_bytes": 9100000000, "min_ram": "16GB" }
+      ]
+    },
+    {
+      "name": "deepseek-r1",
+      "aliases": ["r1", "deepseek-reasoner"],
+      "category": "reasoning",
+      "capabilities": ["chat", "completion", "reasoning"],
+      "default_tag": "latest",
+      "description": "DeepSeek R1 — open reasoning model that emits explicit thinking steps.",
+      "backend_hints": ["ollama"],
+      "variants": [
+        { "tag": "latest", "params": "7B", "size_bytes": 4700000000, "min_ram": "8GB" },
+        { "tag": "7b", "params": "7B", "size_bytes": 4700000000, "min_ram": "8GB" },
+        { "tag": "14b", "params": "14B", "size_bytes": 9000000000, "min_ram": "16GB" },
+        { "tag": "32b", "params": "32B", "size_bytes": 20000000000, "min_ram": "32GB" }
+      ]
+    },
+    {
+      "name": "qwen2.5-coder",
+      "aliases": ["qwen-coder", "qwen2.5coder"],
+      "category": "coding",
+      "capabilities": ["chat", "completion", "tool_use"],
+      "default_tag": "latest",
+      "description": "Qwen2.5 Coder — code generation, completion, and repair.",
+      "backend_hints": ["ollama"],
+      "variants": [
+        { "tag": "latest", "params": "7B", "size_bytes": 4700000000, "min_ram": "8GB" },
+        { "tag": "1.5b", "params": "1.5B", "size_bytes": 1000000000, "min_ram": "3GB" },
+        { "tag": "7b", "params": "7B", "size_bytes": 4700000000, "min_ram": "8GB" },
+        { "tag": "32b", "params": "32B", "size_bytes": 20000000000, "min_ram": "32GB" }
+      ]
+    },
+    {
+      "name": "codellama",
+      "aliases": ["code-llama"],
+      "category": "coding",
+      "capabilities": ["chat", "completion"],
+      "default_tag": "latest",
+      "description": "Meta Code Llama — code generation and infilling.",
+      "backend_hints": ["ollama"],
+      "variants": [
+        { "tag": "latest", "params": "7B", "size_bytes": 3800000000, "min_ram": "8GB" },
+        { "tag": "7b", "params": "7B", "size_bytes": 3800000000, "min_ram": "8GB" },
+        { "tag": "13b", "params": "13B", "size_bytes": 7400000000, "min_ram": "16GB" }
+      ]
+    },
+    {
+      "name": "codegemma",
+      "aliases": ["code-gemma"],
+      "category": "coding",
+      "capabilities": ["chat", "completion"],
+      "default_tag": "latest",
+      "description": "Google CodeGemma — lightweight code completion and generation.",
+      "backend_hints": ["ollama"],
+      "variants": [
+        { "tag": "latest", "params": "7B", "size_bytes": 5000000000, "min_ram": "8GB" },
+        { "tag": "2b", "params": "2B", "size_bytes": 1600000000, "min_ram": "4GB" },
+        { "tag": "7b", "params": "7B", "size_bytes": 5000000000, "min_ram": "8GB" }
+      ]
+    },
+    {
+      "name": "starcoder2",
+      "aliases": ["star-coder2"],
+      "category": "coding",
+      "capabilities": ["completion"],
+      "default_tag": "latest",
+      "description": "StarCoder2 — permissively trained code completion model.",
+      "backend_hints": ["ollama"],
+      "variants": [
+        { "tag": "latest", "params": "3B", "size_bytes": 1700000000, "min_ram": "4GB" },
+        { "tag": "3b", "params": "3B", "size_bytes": 1700000000, "min_ram": "4GB" },
+        { "tag": "7b", "params": "7B", "size_bytes": 4000000000, "min_ram": "8GB" }
+      ]
+    },
+    {
+      "name": "llava",
+      "aliases": ["llava-1.6"],
+      "category": "vision",
+      "capabilities": ["chat", "completion", "vision"],
+      "default_tag": "latest",
+      "description": "LLaVA — multimodal model that answers questions about images.",
+      "backend_hints": ["ollama"],
+      "variants": [
+        { "tag": "latest", "params": "7B", "size_bytes": 4700000000, "min_ram": "8GB" },
+        { "tag": "7b", "params": "7B", "size_bytes": 4700000000, "min_ram": "8GB" },
+        { "tag": "13b", "params": "13B", "size_bytes": 8000000000, "min_ram": "16GB" }
+      ]
+    },
+    {
+      "name": "llama3.2-vision",
+      "aliases": ["llama-vision"],
+      "category": "vision",
+      "capabilities": ["chat", "completion", "vision"],
+      "default_tag": "latest",
+      "description": "Meta Llama 3.2 Vision — image reasoning and description.",
+      "backend_hints": ["ollama"],
+      "variants": [
+        { "tag": "latest", "params": "11B", "size_bytes": 7900000000, "min_ram": "16GB" },
+        { "tag": "11b", "params": "11B", "size_bytes": 7900000000, "min_ram": "16GB" }
+      ]
+    },
+    {
+      "name": "moondream",
+      "aliases": ["moondream2"],
+      "category": "vision",
+      "capabilities": ["chat", "vision"],
+      "default_tag": "latest",
+      "description": "Moondream — tiny vision-language model for edge devices.",
+      "backend_hints": ["ollama"],
+      "variants": [
+        { "tag": "latest", "params": "1.8B", "size_bytes": 1700000000, "min_ram": "4GB" }
+      ]
+    },
+    {
+      "name": "nomic-embed-text",
+      "aliases": ["nomic-embed"],
+      "category": "embedding",
+      "capabilities": ["embed"],
+      "default_tag": "latest",
+      "description": "Nomic Embed Text — high-performing open text embedding model.",
+      "backend_hints": ["ollama"],
+      "variants": [
+        { "tag": "latest", "params": "137M", "size_bytes": 274000000, "min_ram": "2GB" }
+      ]
+    },
+    {
+      "name": "mxbai-embed-large",
+      "aliases": ["mxbai-embed"],
+      "category": "embedding",
+      "capabilities": ["embed"],
+      "default_tag": "latest",
+      "description": "mxbai-embed-large — state-of-the-art large text embedding model.",
+      "backend_hints": ["ollama"],
+      "variants": [
+        { "tag": "latest", "params": "335M", "size_bytes": 670000000, "min_ram": "2GB" }
+      ]
+    },
+    {
+      "name": "all-minilm",
+      "aliases": ["minilm"],
+      "category": "embedding",
+      "capabilities": ["embed"],
+      "default_tag": "latest",
+      "description": "all-MiniLM — small, fast sentence embedding model.",
+      "backend_hints": ["ollama"],
+      "variants": [
+        { "tag": "latest", "params": "23M", "size_bytes": 46000000, "min_ram": "1GB" }
+      ]
+    }
+  ]
+}
