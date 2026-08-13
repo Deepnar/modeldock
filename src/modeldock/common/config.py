@@ -11,7 +11,7 @@ import os
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from modeldock.common.errors import ConfigError
 from modeldock.common.platform import (
@@ -28,7 +28,13 @@ class Settings(BaseModel):
     """Frozen-ish settings model for ModelDock.
 
     Mutable only via explicit ``update`` so precedence is controlled centrally.
+    ``validate_assignment`` is on so that values arriving from a config file or
+    an environment variable are coerced and validated exactly like values passed
+    to the constructor — otherwise ``default_backend`` would stay a raw ``str``
+    and invalid levels/styles would be accepted silently.
     """
+
+    model_config = ConfigDict(validate_assignment=True)
 
     default_backend: RuntimeBackend = RuntimeBackend.OLLAMA
     cache_dir: Path = Field(default_factory=default_cache_dir)
@@ -101,28 +107,55 @@ def _coerce_log_level(value: Any) -> str:
     return str(value).strip().upper()
 
 
-def _apply_mapping(settings: Settings, data: Dict[str, Any]) -> None:
+def _safe_set(settings: Settings, field: str, value: Any, source: str) -> None:
+    """Assign ``field`` on ``settings``, warning and keeping the old value on error.
+
+    Values from a config file or the environment must never crash the process:
+    per the precedence contract, an invalid value falls back to whatever the
+    lower-precedence layer resolved to, with a warning. Values passed
+    programmatically still raise, because those come from the caller's own code.
+    """
+    try:
+        setattr(settings, field, value)
+    except (ValidationError, ConfigError) as exc:
+        import logging
+
+        logging.getLogger("modeldock").warning(
+            "Ignoring invalid %s for %r (%s): %s", source, field, value, exc
+        )
+
+
+def _apply_mapping(settings: Settings, data: Dict[str, Any], source: str = "config value") -> None:
     """Apply a raw mapping onto ``settings`` with safe coercion."""
     if "default_backend" in data and data["default_backend"]:
         value = data["default_backend"]
         # Accept either a string or an already-resolved RuntimeBackend enum.
-        settings.default_backend = (
-            value if isinstance(value, RuntimeBackend) else RuntimeBackend.from_value(str(value))
-        )
+        try:
+            resolved = (
+                value
+                if isinstance(value, RuntimeBackend)
+                else RuntimeBackend.from_value(str(value))
+            )
+        except ValueError as exc:
+            import logging
+
+            logging.getLogger("modeldock").warning("Ignoring invalid %s: %s", source, exc)
+        else:
+            _safe_set(settings, "default_backend", resolved, source)
     if "cache_dir" in data and data["cache_dir"]:
-        settings.cache_dir = Path(str(data["cache_dir"]))
+        _safe_set(settings, "cache_dir", Path(str(data["cache_dir"])), source)
     if "registry_url" in data:
-        settings.registry_url = data["registry_url"] or None
+        _safe_set(settings, "registry_url", data["registry_url"] or None, source)
     if "catalog_source" in data and data["catalog_source"]:
-        settings.catalog_source = str(data["catalog_source"])
+        _safe_set(settings, "catalog_source", str(data["catalog_source"]), source)
     if "log_level" in data and data["log_level"]:
-        settings.log_level = _coerce_log_level(data["log_level"])
+        _safe_set(settings, "log_level", _coerce_log_level(data["log_level"]), source)
     if "progress_style" in data and data["progress_style"]:
-        settings.progress_style = str(data["progress_style"])
+        _safe_set(settings, "progress_style", str(data["progress_style"]), source)
     if "auto_install" in data and data["auto_install"] is not None:
-        settings.auto_install = bool(data["auto_install"])
+        _safe_set(settings, "auto_install", bool(data["auto_install"]), source)
     if "ollama_host" in data:
-        settings.ollama_host = data["ollama_host"] or None
+        _safe_set(settings, "ollama_host", data["ollama_host"] or None, source)
 
 
 def load_settings(
@@ -135,14 +168,17 @@ def load_settings(
     """
     settings = Settings()
 
+    # Lowest precedence first: files later in this list override earlier ones.
+    # An explicit path is the caller's deliberate choice, so it comes last and
+    # wins over the discovered system/user configs.
     candidates: list[Path] = []
     sys_cfg = system_config_dir() / "config.toml"
     user_cfg = user_config_dir() / "config.toml"
-    if config_path is not None:
-        candidates.append(Path(config_path))
     for candidate in (sys_cfg, user_cfg):
         if candidate.exists():
             candidates.append(candidate)
+    if config_path is not None:
+        candidates.append(Path(config_path))
 
     for path in candidates:
         try:
@@ -152,9 +188,9 @@ def load_settings(
 
             logging.getLogger("modeldock").warning("Skipping config %s: %s", path, exc)
             continue
-        _apply_mapping(settings, data)
-        if config_path is None:
-            settings.config_path = path
+        _apply_mapping(settings, data, source=f"value in {path}")
+        # Record the file whose values actually took effect, explicit or not.
+        settings.config_path = path
 
     # Env var overrides (MODELDOCK_*)
     env_map = {
@@ -166,13 +202,16 @@ def load_settings(
         f"{_ENV_PREFIX}PROGRESS_STYLE": "progress_style",
         f"{_ENV_PREFIX}OLLAMA_HOST": "ollama_host",
     }
-    for env_key, field_name in env_map.items():
-        if env_key in os.environ and os.environ[env_key]:
-            raw = os.environ[env_key]
-            # Coerce path-like fields so cache_dir is always a Path (consistent
-            # with the config-file path, which uses Path(str(...))).
-            coerced: Any = Path(raw) if field_name == "cache_dir" else raw
-            setattr(settings, field_name, coerced)
+    env_data = {
+        field_name: os.environ[env_key]
+        for env_key, field_name in env_map.items()
+        if env_key in os.environ and os.environ[env_key]
+    }
+    if env_data:
+        # Route env vars through the same coercion/validation as config files so
+        # e.g. MODELDOCK_DEFAULT_BACKEND resolves to a RuntimeBackend instead of
+        # staying a bare str, and an invalid level warns instead of sticking.
+        _apply_mapping(settings, env_data, source=f"{_ENV_PREFIX}* environment variable")
     if f"{_ENV_PREFIX}AUTO_INSTALL" in os.environ:
         settings.auto_install = os.environ[f"{_ENV_PREFIX}AUTO_INSTALL"].lower() in {
             "1",

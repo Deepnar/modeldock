@@ -45,7 +45,14 @@ class ModelManager:
         settings: Optional[Settings] = None,
     ) -> None:
         self._logger = get_logger("core.manager")
-        self._config = config or ConfigService(explicit=settings.model_dump() if settings else None)
+        # ``settings`` carries only the caller's deliberate overrides. Dumping it
+        # whole would splash defaults for every unset field over the user's
+        # config file as if they had been chosen, so
+        # ``configure(log_level=...)`` would silently reset auto_install,
+        # ollama_host and the rest. exclude_unset keeps the override sparse.
+        self._config = config or ConfigService(
+            explicit=settings.model_dump(exclude_unset=True) if settings else None
+        )
         cfg = self._config.settings
         self._backend = backend or cfg.default_backend
 
