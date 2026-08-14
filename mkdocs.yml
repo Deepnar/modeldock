@@ -83,6 +83,7 @@ nav:
     - Python API: sdk/python-api.md
     - CLI Reference: sdk/cli.md
     - Ollama Integration: sdk/ollama.md
+    - LM Studio Integration: sdk/lmstudio.md
   - Architecture:
     - Design Overview: architecture/overview.md
     - Clean Architecture: architecture/clean-architecture.md

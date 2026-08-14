@@ -144,6 +144,13 @@ class FakeRuntime(RuntimePort):
     def default_tag_for(self, spec: ModelSpec) -> str:
         return spec.default_tag
 
+    def models_for_category(self, category: Category) -> List[ModelRef]:
+        """No backend-specific mapping: callers fall back to the shared catalog."""
+        return []
+
+    def models_for_capability(self, capability: Capability) -> List[ModelRef]:
+        return []
+
     def status(self) -> RuntimeStatus:
         return RuntimeStatus(
             backend=self.backend,
