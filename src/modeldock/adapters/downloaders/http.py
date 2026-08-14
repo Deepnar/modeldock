@@ -30,11 +30,32 @@ class HttpDownloader:
         header_name = "Content" + "-" + "Length"
         try:
             with create_client() as client, client.stream("GET", url, headers=headers) as resp:
+                if existing and resp.status_code == 416:
+                    # The partial file is stale (longer than the resource, or
+                    # the resource changed). Start over rather than failing.
+                    self._logger.debug(
+                        "Stale partial file for %s (HTTP 416); restarting download", spec.name
+                    )
+                    resp.close()
+                    dest.unlink(missing_ok=True)
+                    return self.download(spec, dest, progress)
                 resp.raise_for_status()
+                # Only append when the server actually honored the Range
+                # request (206). A server that ignores it answers 200 with the
+                # whole body, and appending that to the partial file silently
+                # produces a corrupt artifact of size existing + full.
+                resumed = existing > 0 and resp.status_code == 206
+                if existing and not resumed:
+                    self._logger.debug(
+                        "Range not honored for %s (HTTP %s); restarting download",
+                        spec.name,
+                        resp.status_code,
+                    )
+                    existing = 0
                 total = int(resp.headers.get(header_name, 0)) + existing
                 if progress is not None:
                     progress.start(total=total, desc=f"Download {spec.name}")
-                mode = "ab" if existing else "wb"
+                mode = "ab" if resumed else "wb"
                 with dest.open(mode) as fh:
                     for chunk in resp.iter_bytes(self._chunk_size):
                         fh.write(chunk)

@@ -134,15 +134,13 @@ class LMStudioRuntime(BaseRuntime):
             model_id = self._parse_model_id(entry)
             if not model_id:
                 continue
-            # LM Studio uses author/model-name format
-            # Parse into ModelRef with name and tag
-            if "/" in model_id:
-                name, tag = model_id.rsplit("/", 1)
-            elif ":" in model_id:
-                name, tag = model_id.split(":", 1)
-            else:
-                name, tag = model_id, "latest"
-            ref = ModelRef(name=name, tag=tag, backend=RuntimeBackend.LM_STUDIO)
+            # LM Studio IDs look like "publisher/model-name" — the slash is a
+            # namespace separator that belongs to the name, not a tag
+            # separator. Splitting on it made the publisher the name and the
+            # model the tag, so these refs never matched a parsed reference and
+            # is_installed() always returned False. Only ":" separates a tag,
+            # which is exactly what ModelRef.parse already implements.
+            ref = ModelRef.parse(model_id, backend=RuntimeBackend.LM_STUDIO)
             refs.append(ref)
         return refs
 
