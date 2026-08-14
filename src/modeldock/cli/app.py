@@ -81,11 +81,27 @@ def main(
     ),
 ) -> None:
     """Global options applied before any subcommand."""
+    import os
+
     configure_logging(level=_resolve_log_level(log_level))
     if no_progress:
-        import os
-
         os.environ["MODELDOCK_PROGRESS_STYLE"] = "silent"
+    if backend is not None:
+        # Publish the global choice through the config layer so every
+        # subcommand picks it up, including those with no --backend of their
+        # own. resolve_backend validates first, so a typo fails loudly here
+        # instead of silently falling back to the default runtime.
+        from modeldock.cli.console import print_error
+        from modeldock.cli.factory import resolve_backend
+        from modeldock.common.errors import ConfigError
+
+        try:
+            resolved = resolve_backend(backend)
+        except ConfigError as exc:
+            print_error(exc)
+            raise typer.Exit(code=1) from exc
+        assert resolved is not None
+        os.environ["MODELDOCK_DEFAULT_BACKEND"] = resolved.value
 
 
 def run() -> None:

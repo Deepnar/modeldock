@@ -5,7 +5,7 @@ from __future__ import annotations
 import typer
 
 from modeldock.cli.console import print_error
-from modeldock.core.manager import ModelManager
+from modeldock.cli.factory import manager_for
 
 load_app = typer.Typer()
 
@@ -20,7 +20,7 @@ def load_cmd(
 ) -> None:
     """Load a model, auto-installing if missing."""
     try:
-        mgr = ModelManager()
+        mgr = manager_for(backend)
         name = f"{model}:{tag}" if tag != "latest" else model
         client = mgr.load(name, auto_install=auto_install)
         status = mgr.runtime_status()

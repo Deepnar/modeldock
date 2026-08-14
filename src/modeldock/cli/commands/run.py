@@ -5,7 +5,7 @@ from __future__ import annotations
 import typer
 
 from modeldock.cli.console import print_error
-from modeldock.core.manager import ModelManager
+from modeldock.cli.factory import manager_for
 
 
 def run_cmd(
@@ -16,7 +16,7 @@ def run_cmd(
 ) -> None:
     """Run an interactive session with a model, auto-installing if missing."""
     try:
-        mgr = ModelManager()
+        mgr = manager_for(backend)
         result = mgr.run(model, prompt=prompt)
         if hasattr(result, "success") and not result.success:
             print_error(Exception(result.error or "run failed"), debug)

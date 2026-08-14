@@ -37,6 +37,7 @@ def config_set(
 ) -> None:
     """Set a configuration value (writes user config.toml)."""
     try:
+        from modeldock.common.config import _toml_load
         from modeldock.common.platform import user_config_dir
 
         cfg_dir = user_config_dir()
@@ -44,28 +45,43 @@ def config_set(
         cfg_path = cfg_dir / "config.toml"
         existing: Dict[str, Any] = {}
         if cfg_path.exists():
-            import tomli
-
-            with cfg_path.open("rb") as fh:
-                existing = tomli.load(fh)
+            # Reuse the shared loader: `import tomli` fails on Python 3.11+,
+            # where tomli is not installed (it is a `python_version < "3.11"`
+            # dependency) and tomllib is used instead.
+            existing = _toml_load(cfg_path)
         existing[key] = value
 
-        with cfg_path.open("w", encoding="utf-8") as fh:
+        # Rewrite every key, not just this one — writing only the new key would
+        # silently delete the rest of the user's configuration. Write to a temp
+        # file and replace so an interrupted write cannot truncate the config.
+        tmp_path = cfg_path.with_suffix(".toml.tmp")
+        with tmp_path.open("w", encoding="utf-8") as fh:
             # TOML has no stdlib writer; emit a minimal valid TOML manually.
-            fh.write(f"{key} = {_toml_scalar(value)}\n")
+            for existing_key, existing_value in existing.items():
+                fh.write(f"{existing_key} = {_toml_scalar(existing_value)}\n")
+        tmp_path.replace(cfg_path)
         typer.echo(f"Set {key} = {value} in {cfg_path}")
     except Exception as exc:  # noqa: BLE001 - top-level CLI boundary
         print_error(exc, debug)
         raise typer.Exit(code=1)  # noqa: B904
 
 
-def _toml_scalar(value: str) -> str:
-    """Render a value as a TOML scalar literal."""
-    lowered = value.strip().lower()
+def _toml_scalar(value: Any) -> str:
+    """Render a value as a TOML scalar literal.
+
+    Accepts values already typed by the TOML parser (round-tripping keys the
+    user set earlier) as well as raw strings from the command line.
+    """
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, int):
+        return str(value)
+    text = str(value)
+    lowered = text.strip().lower()
     if lowered in {"true", "false"}:
         return lowered
     try:
-        int(value)
-        return value
+        int(text)
+        return text
     except ValueError:
-        return f'"{value}"'
+        return f'"{text}"'
