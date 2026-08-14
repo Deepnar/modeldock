@@ -64,18 +64,21 @@ class RuntimeRegistry:
     def get(self, backend: RuntimeBackend, host: str | None = None) -> RuntimePort:
         """Return a runtime instance for backend (entry points win).
 
-        ``host`` is forwarded to the Ollama adapter so a configured host
-        override always applies (the client is built lazily per instance).
+        ``host`` is forwarded to any adapter that supports a host override, so
+        a configured host always applies (clients are built lazily per
+        instance). Adapters that do not take one are left untouched.
         """
         factory = self._entry_points.get(backend) or _BUILTIN.get(backend)
         if factory is None:
             raise KeyError(f"No runtime registered for backend {backend.value!r}")
         runtime = factory()
-        if host is not None and backend == RuntimeBackend.OLLAMA:
-            try:
-                runtime._host = host  # type: ignore[attr-defined]
-            except Exception:  # nosec B110 - built-in adapter supports _host
-                pass
+        if host is not None and hasattr(runtime, "_host"):
+            runtime._host = host
+            # A host set after construction must invalidate any host the
+            # adapter already resolved and cached.
+            clear = getattr(runtime, "clear_host_cache", None)
+            if callable(clear):
+                clear()
         return runtime
 
     @staticmethod

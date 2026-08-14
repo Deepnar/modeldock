@@ -163,6 +163,23 @@ progress_style  = "rich"
 | `MODELDOCK_DEFAULT_BACKEND` | Runtime backend | `ollama` |
 | `MODELDOCK_AUTO_INSTALL` | Auto-download missing models | `false` |
 | `MODELDOCK_CACHE_DIR` | Override cache location | platform default |
+| `MODELDOCK_OLLAMA_HOST` | Ollama server base URL | auto-discovered |
+| `MODELDOCK_LMSTUDIO_HOST` | LM Studio server base URL | auto-discovered |
+
+### Runtime server URLs
+
+Runtimes that talk to a local server resolve their base URL in this order:
+
+1. `ollama_host` / `lmstudio_host` in `config.toml`
+2. `MODELDOCK_OLLAMA_HOST` / `MODELDOCK_LMSTUDIO_HOST`
+3. The runtime's own convention — `OLLAMA_HOST`, `LM_STUDIO_HOST`
+4. **Auto-discovery** — the first address that answers: `localhost`, `127.0.0.1`,
+   then `host.docker.internal` (so a container reaches a server on the host)
+5. The documented default (`http://localhost:11434`, `http://localhost:1234`)
+
+Discovery only runs when nothing is configured, so naming a host costs no
+probing. URLs are normalized: `localhost:1234`, a trailing slash, and the
+`/v1`-suffixed URL LM Studio's UI displays are all accepted.
 
 ## Supported Runtimes
 

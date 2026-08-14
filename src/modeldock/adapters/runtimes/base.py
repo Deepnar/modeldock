@@ -6,7 +6,8 @@ each concrete runtime only implements runtime-specific calls. See Architecture.m
 
 from __future__ import annotations
 
-from typing import Any, List, Optional
+import os
+from typing import Any, Iterable, List, Optional, Sequence
 
 from modeldock.common.errors import (
     ModelNotInstalledError,
@@ -17,6 +18,28 @@ from modeldock.domain.model import Device, ModelRef, ModelSpec, RuntimeBackend, 
 from modeldock.ports.runtime import PullResult, RunResult
 
 _AVAILABILITY_TTL = 5.0
+# Discovery probes are best-effort and run before any real work, so they are
+# kept short: a refused connection returns immediately, and this only bounds
+# the pathological case where packets are dropped rather than refused.
+_DISCOVERY_TIMEOUT = 0.5
+
+
+def normalize_host(host: str) -> str:
+    """Return ``host`` as a bare scheme://authority base URL.
+
+    Accepts what users actually type — a bare ``localhost:1234``, a trailing
+    slash, or a URL that already carries the OpenAI-compatible ``/v1`` suffix —
+    and normalizes it so callers can append their own path without producing
+    ``//v1`` or ``/v1/v1``.
+    """
+    text = host.strip().rstrip("/")
+    if not text:
+        return text
+    if "://" not in text:
+        text = f"http://{text}"
+    if text.endswith("/v1"):
+        text = text[: -len("/v1")]
+    return text
 
 
 class BaseRuntime:
@@ -31,6 +54,82 @@ class BaseRuntime:
         self._logger = get_logger(f"runtime.{self.backend.value}")
         self._availability: Optional[bool] = None
         self._availability_checked_at: float = 0.0
+        self._resolved_host: Optional[str] = None
+
+    # --- host resolution ---------------------------------------------------
+
+    def resolve_host(
+        self,
+        explicit: Optional[str] = None,
+        env_vars: Sequence[str] = (),
+        default: str = "",
+        candidates: Sequence[str] = (),
+        probe_path: str = "",
+    ) -> str:
+        """Resolve this runtime's base URL, discovering it when unconfigured.
+
+        Precedence, highest first:
+
+        1. ``explicit`` — a host passed to the adapter (from config or code)
+        2. ``env_vars`` — the first environment variable that is set
+        3. auto-discovery — the first reachable entry in ``candidates``
+        4. ``default``
+
+        Discovery only runs when nothing is configured, so a user who names a
+        host never pays for a probe and never has their choice second-guessed.
+        Every result is normalized, so callers can rely on a bare
+        ``scheme://authority`` base URL. The resolved value is cached for the
+        lifetime of the adapter.
+        """
+        if self._resolved_host is not None:
+            return self._resolved_host
+
+        resolved = self._first_configured(explicit, env_vars)
+        if resolved is None and candidates and probe_path:
+            resolved = self._discover_host(candidates, probe_path)
+        if resolved is None:
+            resolved = default
+
+        self._resolved_host = normalize_host(resolved)
+        return self._resolved_host
+
+    @staticmethod
+    def _first_configured(explicit: Optional[str], env_vars: Iterable[str]) -> Optional[str]:
+        """Return the first explicitly configured host, or None."""
+        if explicit:
+            return explicit
+        for name in env_vars:
+            value = os.environ.get(name)
+            if value:
+                return value
+        return None
+
+    def _discover_host(self, candidates: Sequence[str], probe_path: str) -> Optional[str]:
+        """Return the first candidate answering ``probe_path``, or None.
+
+        Used for unconfigured setups where the server may not be on the
+        conventional loopback address — a container reaching the host, or a
+        remapped port. Probes are short so a fully offline machine is not held
+        up for long.
+        """
+        import httpx
+
+        for candidate in candidates:
+            base = normalize_host(candidate)
+            if not base:
+                continue
+            try:
+                response = httpx.get(f"{base}{probe_path}", timeout=_DISCOVERY_TIMEOUT)
+            except Exception:  # nosec B112 - unreachable candidate, try the next
+                continue
+            if response.status_code == 200:
+                self._logger.debug("Discovered %s server at %s", self.backend.value, base)
+                return base
+        return None
+
+    def clear_host_cache(self) -> None:
+        """Forget the resolved host so the next call re-resolves it."""
+        self._resolved_host = None
 
     # --- shared, final behavior -------------------------------------------
 

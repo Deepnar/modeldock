@@ -25,6 +25,25 @@ _DEFAULT_TIMEOUT = 30.0
 _LIST_VERIFY_BACKOFF_SECONDS = 0.1
 _LIST_VERIFY_ATTEMPTS = 10
 
+# Environment overrides, highest precedence first. LM_STUDIO_HOST is LM
+# Studio's own convention; MODELDOCK_LMSTUDIO_HOST is the ModelDock-namespaced
+# form set by `Settings.lmstudio_host`.
+_HOST_ENV_VARS = ("MODELDOCK_LMSTUDIO_HOST", "LM_STUDIO_HOST")
+
+# Probed in order when no host is configured. Covers the conventional
+# loopback address, the IPv4 literal (hosts where "localhost" resolves to IPv6
+# first and the server binds v4 only), and the gateway a container uses to
+# reach a server on the host.
+_HOST_CANDIDATES = (
+    "http://localhost:1234",
+    "http://127.0.0.1:1234",
+    "http://host.docker.internal:1234",
+)
+
+# Cheap, always-present endpoint used to decide whether a candidate is an
+# LM Studio server that is actually up.
+_PROBE_PATH = "/v1/models"
+
 
 class LMStudioRuntime(BaseRuntime):
     """Runtime adapter for LM Studio."""
@@ -44,10 +63,20 @@ class LMStudioRuntime(BaseRuntime):
     # --- internal helpers -------------------------------------------------
 
     def _resolve_host(self) -> str:
-        """Host precedence: explicit arg > LM_STUDIO_HOST env > default."""
-        import os
+        """Resolve the server base URL.
 
-        return self._host or os.environ.get("LM_STUDIO_HOST") or _DEFAULT_HOST
+        Precedence: explicit arg (config) > MODELDOCK_LMSTUDIO_HOST >
+        LM_STUDIO_HOST > auto-discovery across the known local addresses >
+        ``http://localhost:1234``. Discovery runs only when nothing is
+        configured. See ``BaseRuntime.resolve_host``.
+        """
+        return self.resolve_host(
+            explicit=self._host,
+            env_vars=_HOST_ENV_VARS,
+            default=_DEFAULT_HOST,
+            candidates=_HOST_CANDIDATES,
+            probe_path=_PROBE_PATH,
+        )
 
     def _resolve_api_key(self) -> Optional[str]:
         """API key precedence: explicit arg > LM_API_TOKEN env > None."""
