@@ -100,8 +100,8 @@ def main(
         except ConfigError as exc:
             print_error(exc)
             raise typer.Exit(code=1) from exc
-        assert resolved is not None
-        os.environ["MODELDOCK_DEFAULT_BACKEND"] = resolved.value
+        if resolved is not None:
+            os.environ["MODELDOCK_DEFAULT_BACKEND"] = resolved.value
 
 
 def run() -> None:
