@@ -44,6 +44,7 @@ class Settings(BaseModel):
     progress_style: str = "rich"
     auto_install: bool = False
     ollama_host: Optional[str] = None
+    lmstudio_host: Optional[str] = None
     config_path: Optional[Path] = None
 
     @field_validator("log_level")
@@ -156,6 +157,8 @@ def _apply_mapping(settings: Settings, data: Dict[str, Any], source: str = "conf
         _safe_set(settings, "auto_install", bool(data["auto_install"]), source)
     if "ollama_host" in data:
         _safe_set(settings, "ollama_host", data["ollama_host"] or None, source)
+    if "lmstudio_host" in data:
+        _safe_set(settings, "lmstudio_host", data["lmstudio_host"] or None, source)
 
 
 def load_settings(
@@ -201,6 +204,7 @@ def load_settings(
         f"{_ENV_PREFIX}LOG_LEVEL": "log_level",
         f"{_ENV_PREFIX}PROGRESS_STYLE": "progress_style",
         f"{_ENV_PREFIX}OLLAMA_HOST": "ollama_host",
+        f"{_ENV_PREFIX}LMSTUDIO_HOST": "lmstudio_host",
     }
     env_data = {
         field_name: os.environ[env_key]

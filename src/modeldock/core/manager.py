@@ -106,15 +106,23 @@ class ModelManager:
                 return BundledRegistry()
             return live
 
+    #: Config field holding the host override for each backend that has one.
+    _HOST_SETTING_FOR = {
+        RuntimeBackend.OLLAMA: "ollama_host",
+        RuntimeBackend.LM_STUDIO: "lmstudio_host",
+    }
+
     def _resolve_runtime(self, backend: RuntimeBackend, cfg: Settings) -> RuntimePort:
+        # Apply the configured host at construction time so it always takes
+        # effect (clients are built lazily and cached per instance). Backends
+        # with no configured host resolve their own, discovering it when the
+        # server is not on the conventional address.
+        host_field = self._HOST_SETTING_FOR.get(backend)
+        host = getattr(cfg, host_field, None) if host_field else None
         try:
-            runtime = self._runtime_registry.get(backend)
+            runtime = self._runtime_registry.get(backend, host=host)
         except KeyError as exc:
             raise RuntimeUnavailableError(backend.value) from exc
-        # Apply the configured host at construction time so it always takes
-        # effect (the Ollama client is built lazily and cached per instance).
-        if backend == RuntimeBackend.OLLAMA and cfg.ollama_host:
-            runtime = self._runtime_registry.get(backend, host=cfg.ollama_host)
         if not runtime.is_available():
             self._logger.warning("Runtime %s not available", backend.value)
         return runtime

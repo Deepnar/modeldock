@@ -21,6 +21,22 @@ from modeldock.domain.model import Device, ModelRef, RuntimeBackend
 from modeldock.ports.runtime import PullResult, RunResult
 
 _OLLAMA_DEFAULT_HOST = "http://localhost:11434"
+
+# Environment overrides, highest precedence first. OLLAMA_HOST is Ollama's own
+# convention; MODELDOCK_OLLAMA_HOST is the ModelDock-namespaced form set by
+# ``Settings.ollama_host``.
+_HOST_ENV_VARS = ("MODELDOCK_OLLAMA_HOST", "OLLAMA_HOST")
+
+# Probed in order when no host is configured (see the LM Studio adapter for
+# why each address is here).
+_HOST_CANDIDATES = (
+    "http://localhost:11434",
+    "http://127.0.0.1:11434",
+    "http://host.docker.internal:11434",
+)
+
+# Ollama's root endpoint answers 200 with "Ollama is running".
+_PROBE_PATH = "/"
 _PULL_VERIFY_BACKOFF_SECONDS = 0.1
 _PULL_VERIFY_ATTEMPTS = 10
 _CLIENT_TIMEOUT_SECONDS = 30.0
@@ -41,10 +57,19 @@ class OllamaRuntime(BaseRuntime):
     # --- internal helpers -------------------------------------------------
 
     def _resolve_host(self) -> str:
-        """Host precedence: explicit arg > OLLAMA_HOST env > default."""
-        import os
+        """Resolve the daemon base URL.
 
-        return self._host or os.environ.get("OLLAMA_HOST") or _OLLAMA_DEFAULT_HOST
+        Precedence: explicit arg (config) > MODELDOCK_OLLAMA_HOST >
+        OLLAMA_HOST > auto-discovery across the known local addresses >
+        ``http://localhost:11434``. See ``BaseRuntime.resolve_host``.
+        """
+        return self.resolve_host(
+            explicit=self._host,
+            env_vars=_HOST_ENV_VARS,
+            default=_OLLAMA_DEFAULT_HOST,
+            candidates=_HOST_CANDIDATES,
+            probe_path=_PROBE_PATH,
+        )
 
     def _ensure_client(self) -> Any:
         """Lazily build an ollama.Client; raise if the SDK is missing."""
