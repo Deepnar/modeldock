@@ -56,3 +56,76 @@ def test_default_cache_dir_override(monkeypatch: pytest.MonkeyPatch, tmp_path: P
 
 def test_is_windows_bool() -> None:
     assert isinstance(is_windows(), bool)
+
+
+# --- precedence and validation across layers -------------------------------
+
+
+def _isolate_config_dirs(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
+    """Point the system/user config lookups at an empty temp dir."""
+    user_dir = tmp_path / "user"
+    user_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr("modeldock.common.config.system_config_dir", lambda: tmp_path / "absent")
+    monkeypatch.setattr("modeldock.common.config.user_config_dir", lambda: user_dir)
+    return user_dir
+
+
+def test_env_backend_resolves_to_enum(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Env values must be coerced like constructor values, not stored as str."""
+    monkeypatch.setenv("MODELDOCK_DEFAULT_BACKEND", "lmstudio")
+    s = load_settings()
+    assert s.default_backend is RuntimeBackend.LM_STUDIO
+
+
+def test_invalid_env_values_fall_back_to_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Invalid env values warn and keep the lower-precedence value, never crash."""
+    monkeypatch.setenv("MODELDOCK_LOG_LEVEL", "not-a-level")
+    monkeypatch.setenv("MODELDOCK_CATALOG_SOURCE", "bogus")
+    monkeypatch.setenv("MODELDOCK_PROGRESS_STYLE", "bogus")
+    monkeypatch.setenv("MODELDOCK_DEFAULT_BACKEND", "nope")
+    s = load_settings()
+    assert s.log_level == "ERROR"
+    assert s.catalog_source == "auto"
+    assert s.progress_style == "rich"
+    assert s.default_backend is RuntimeBackend.OLLAMA
+
+
+def test_explicit_config_path_beats_user_config(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    user_dir = _isolate_config_dirs(monkeypatch, tmp_path)
+    (user_dir / "config.toml").write_text(
+        'log_level = "DEBUG"\nauto_install = true\nollama_host = "http://user:11434"\n'
+    )
+    explicit = tmp_path / "explicit.toml"
+    explicit.write_text('log_level = "WARNING"\n')
+
+    s = load_settings(config_path=explicit)
+
+    assert s.log_level == "WARNING"  # explicit path wins
+    assert s.auto_install is True  # keys it does not set still come from user config
+    assert s.ollama_host == "http://user:11434"
+    assert s.config_path == explicit
+
+
+def test_sparse_explicit_overrides_preserve_other_settings(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """configure(log_level=...) must not reset auto_install/ollama_host."""
+    user_dir = _isolate_config_dirs(monkeypatch, tmp_path)
+    (user_dir / "config.toml").write_text(
+        'auto_install = true\nollama_host = "http://user:11434"\n'
+    )
+
+    overrides = Settings(log_level="INFO").model_dump(exclude_unset=True)
+    s = load_settings(explicit=overrides)
+
+    assert s.log_level == "INFO"
+    assert s.auto_install is True
+    assert s.ollama_host == "http://user:11434"
+
+
+def test_corrupt_config_is_skipped(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    user_dir = _isolate_config_dirs(monkeypatch, tmp_path)
+    (user_dir / "config.toml").write_text("this is not = valid = toml")
+    assert load_settings().log_level == "ERROR"
