@@ -170,13 +170,34 @@ def test_list_installed_parses_models() -> None:
     refs = runtime.list_installed()
 
     assert len(refs) == 3
-    assert refs[0].name == "qwen"
-    assert refs[0].tag == "qwen3.5-9b"
-    assert refs[1].name == "llama"
-    assert refs[1].tag == "llama-3.1-8b"
+    # "publisher/model" is a namespaced name, not name + tag: the slash must
+    # stay in the name so these refs round-trip with ModelRef.parse().
+    assert refs[0].name == "qwen/qwen3.5-9b"
+    assert refs[0].tag == "latest"
+    assert refs[1].name == "llama/llama-3.1-8b"
+    assert refs[1].tag == "latest"
     assert refs[2].name == "deepseek-r1-distill-qwen-7b"
     assert refs[2].tag == "latest"
     assert all(r.backend.value == "lmstudio" for r in refs)
+
+
+def test_list_installed_round_trips_with_model_ref_parse() -> None:
+    """A listed model must be recognized as installed when parsed from its ID."""
+    http_client = _MockHTTPClient(models_response={"data": [{"id": "qwen/qwen3.5-9b"}]})
+    runtime = _runtime_with_http_client(http_client)
+
+    assert runtime.is_installed(ModelRef.parse("qwen/qwen3.5-9b"))
+    assert not runtime.is_installed(ModelRef.parse("qwen/other-model"))
+
+
+def test_list_installed_keeps_explicit_tag() -> None:
+    """An explicit ``:tag`` suffix is still parsed as a tag."""
+    http_client = _MockHTTPClient(models_response={"data": [{"id": "qwen/qwen3.5-9b:q4_k_m"}]})
+    runtime = _runtime_with_http_client(http_client)
+
+    ref = runtime.list_installed()[0]
+    assert ref.name == "qwen/qwen3.5-9b"
+    assert ref.tag == "q4_k_m"
 
 
 def test_list_installed_returns_empty_when_server_unreachable() -> None:
@@ -209,7 +230,7 @@ def test_is_installed_true_when_model_present() -> None:
     """Test is_installed returns True when model is in list."""
     http_client = _MockHTTPClient(models_response={"data": [{"id": "qwen/qwen3.5-9b"}]})
     runtime = _runtime_with_http_client(http_client)
-    ref = ModelRef(name="qwen", tag="qwen3.5-9b", backend=RuntimeBackend.LM_STUDIO)
+    ref = ModelRef(name="qwen/qwen3.5-9b", tag="latest", backend=RuntimeBackend.LM_STUDIO)
     assert runtime.is_installed(ref) is True
 
 
@@ -217,7 +238,7 @@ def test_is_installed_false_when_model_absent() -> None:
     """Test is_installed returns False when model is not in list."""
     http_client = _MockHTTPClient(models_response={"data": []})
     runtime = _runtime_with_http_client(http_client)
-    ref = ModelRef(name="qwen", tag="qwen3.5-9b", backend=RuntimeBackend.LM_STUDIO)
+    ref = ModelRef(name="qwen/qwen3.5-9b", tag="latest", backend=RuntimeBackend.LM_STUDIO)
     assert runtime.is_installed(ref) is False
 
 
@@ -228,7 +249,7 @@ def test_pull_skips_when_already_installed() -> None:
     """Test pull is idempotent when model is already installed."""
     http_client = _MockHTTPClient(models_response={"data": [{"id": "qwen/qwen3.5-9b"}]})
     runtime = _runtime_with_http_client(http_client)
-    ref = ModelRef(name="qwen", tag="qwen3.5-9b", backend=RuntimeBackend.LM_STUDIO)
+    ref = ModelRef(name="qwen/qwen3.5-9b", tag="latest", backend=RuntimeBackend.LM_STUDIO)
 
     result = runtime.pull(ref)
 
@@ -245,7 +266,7 @@ def test_pull_downloads_when_not_installed() -> None:
         download_response={"status": "completed"},
     )
     runtime = _runtime_with_http_client(http_client)
-    ref = ModelRef(name="qwen", tag="qwen3.5-9b", backend=RuntimeBackend.LM_STUDIO)
+    ref = ModelRef(name="qwen/qwen3.5-9b", tag="latest", backend=RuntimeBackend.LM_STUDIO)
 
     result = runtime.pull(ref)
 
@@ -260,7 +281,7 @@ def test_pull_fails_when_download_api_unavailable() -> None:
         download_response={"status": "failed", "error": "Model not found"},
     )
     runtime = _runtime_with_http_client(http_client)
-    ref = ModelRef(name="qwen", tag="qwen3.5-9b", backend=RuntimeBackend.LM_STUDIO)
+    ref = ModelRef(name="qwen/qwen3.5-9b", tag="latest", backend=RuntimeBackend.LM_STUDIO)
 
     result = runtime.pull(ref)
 
@@ -274,7 +295,7 @@ def test_pull_fails_when_network_error() -> None:
     http_client.get.return_value = _MockHTTPResponse(200, {"data": []})
     http_client.post.side_effect = RuntimeError("connection refused")
     runtime = _runtime_with_http_client(http_client)
-    ref = ModelRef(name="qwen", tag="qwen3.5-9b", backend=RuntimeBackend.LM_STUDIO)
+    ref = ModelRef(name="qwen/qwen3.5-9b", tag="latest", backend=RuntimeBackend.LM_STUDIO)
 
     result = runtime.pull(ref)
 
@@ -300,7 +321,7 @@ def test_pull_reports_progress() -> None:
         download_response={"status": "completed"},
     )
     runtime = _runtime_with_http_client(http_client)
-    ref = ModelRef(name="qwen", tag="qwen3.5-9b", backend=RuntimeBackend.LM_STUDIO)
+    ref = ModelRef(name="qwen/qwen3.5-9b", tag="latest", backend=RuntimeBackend.LM_STUDIO)
     progress = _Progress()
 
     result = runtime.pull(ref, progress=progress)
@@ -319,7 +340,7 @@ def test_remove_unloads_model() -> None:
         unload_response={"status": "ok"},
     )
     runtime = _runtime_with_http_client(http_client)
-    ref = ModelRef(name="qwen", tag="qwen3.5-9b", backend=RuntimeBackend.LM_STUDIO)
+    ref = ModelRef(name="qwen/qwen3.5-9b", tag="latest", backend=RuntimeBackend.LM_STUDIO)
 
     runtime.remove(ref)
 
@@ -344,7 +365,7 @@ def test_remove_suggests_ui_when_unload_fails() -> None:
     http_client.get.return_value = _MockHTTPResponse(200, {"data": []})
     http_client.post.side_effect = RuntimeError("unload failed")
     runtime = _runtime_with_http_client(http_client)
-    ref = ModelRef(name="qwen", tag="qwen3.5-9b", backend=RuntimeBackend.LM_STUDIO)
+    ref = ModelRef(name="qwen/qwen3.5-9b", tag="latest", backend=RuntimeBackend.LM_STUDIO)
 
     with pytest.raises(DownloadError) as exc_info:
         runtime.remove(ref)
@@ -365,7 +386,7 @@ def test_run_single_prompt_streams_tokens() -> None:
     written: List[str] = []
     with patch.object(LMStudioRuntime, "_write", staticmethod(lambda t: written.append(t))):
         result = runtime.run(
-            ModelRef(name="qwen", tag="qwen3.5-9b", backend=RuntimeBackend.LM_STUDIO),
+            ModelRef(name="qwen/qwen3.5-9b", tag="latest", backend=RuntimeBackend.LM_STUDIO),
             prompt="hi",
         )
 
@@ -384,7 +405,7 @@ def test_run_raises_when_model_not_installed() -> None:
 
     with pytest.raises(ModelNotInstalledError):
         runtime.run(
-            ModelRef(name="qwen", tag="qwen3.5-9b", backend=RuntimeBackend.LM_STUDIO),
+            ModelRef(name="qwen/qwen3.5-9b", tag="latest", backend=RuntimeBackend.LM_STUDIO),
             prompt="hi",
         )
 
@@ -410,7 +431,7 @@ def test_run_single_prompt_wraps_sdk_error() -> None:
     runtime._ensure_http_client = lambda: http_client  # type: ignore[assignment]
 
     result = runtime.run(
-        ModelRef(name="qwen", tag="qwen3.5-9b", backend=RuntimeBackend.LM_STUDIO),
+        ModelRef(name="qwen/qwen3.5-9b", tag="latest", backend=RuntimeBackend.LM_STUDIO),
         prompt="hi",
     )
 
@@ -431,7 +452,7 @@ def test_run_repl_reads_stdin_until_exit() -> None:
         patch("sys.stdin", __import__("io").StringIO("first\nsecond\nexit\n")),
     ):
         result = runtime.run(
-            ModelRef(name="qwen", tag="qwen3.5-9b", backend=RuntimeBackend.LM_STUDIO),
+            ModelRef(name="qwen/qwen3.5-9b", tag="latest", backend=RuntimeBackend.LM_STUDIO),
         )
 
     assert result.success is True

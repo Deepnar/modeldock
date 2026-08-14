@@ -45,7 +45,14 @@ class ModelManager:
         settings: Optional[Settings] = None,
     ) -> None:
         self._logger = get_logger("core.manager")
-        self._config = config or ConfigService(explicit=settings.model_dump() if settings else None)
+        # ``settings`` carries only the caller's deliberate overrides. Dumping it
+        # whole would splash defaults for every unset field over the user's
+        # config file as if they had been chosen, so
+        # ``configure(log_level=...)`` would silently reset auto_install,
+        # ollama_host and the rest. exclude_unset keeps the override sparse.
+        self._config = config or ConfigService(
+            explicit=settings.model_dump(exclude_unset=True) if settings else None
+        )
         cfg = self._config.settings
         self._backend = backend or cfg.default_backend
 
@@ -82,14 +89,22 @@ class ModelManager:
 
             return OllamaLibraryRegistry(cache_dir=cfg.cache_dir)
         else:  # "auto" — try ollama, fallback to bundled
+            from modeldock.adapters.registry.bundled import BundledRegistry
+
             try:
                 from modeldock.adapters.registry.ollama_library import OllamaLibraryRegistry
 
-                return OllamaLibraryRegistry(cache_dir=cfg.cache_dir)
-            except Exception:
-                from modeldock.adapters.registry.bundled import BundledRegistry
-
+                live = OllamaLibraryRegistry(cache_dir=cfg.cache_dir)
+            except Exception as exc:
+                self._logger.debug("Live catalog unavailable (%s); using bundled", exc)
                 return BundledRegistry()
+            # The live registry swallows network errors and constructs with an
+            # empty index when there is neither network nor cache, so an
+            # exception is not the only failure mode we must fall back from.
+            if not live.list_all():
+                self._logger.info("Live catalog empty; falling back to the bundled catalog")
+                return BundledRegistry()
+            return live
 
     def _resolve_runtime(self, backend: RuntimeBackend, cfg: Settings) -> RuntimePort:
         try:

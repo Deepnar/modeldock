@@ -5,7 +5,7 @@ from __future__ import annotations
 import typer
 
 from modeldock.cli.console import print_error
-from modeldock.core.manager import ModelManager
+from modeldock.cli.factory import manager_for
 
 
 def remove_cmd(
@@ -16,7 +16,7 @@ def remove_cmd(
 ) -> None:
     """Uninstall model(s)."""
     try:
-        mgr = ModelManager()
+        mgr = manager_for(backend)
         for name in models:
             if not yes:
                 confirm = typer.confirm(f"Remove {name}?")

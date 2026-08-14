@@ -5,7 +5,7 @@ from __future__ import annotations
 import typer
 
 from modeldock.cli.console import print_error
-from modeldock.core.manager import ModelManager
+from modeldock.cli.factory import manager_for
 
 
 def install_category_cmd(
@@ -15,7 +15,7 @@ def install_category_cmd(
 ) -> None:
     """Install every model in a category."""
     try:
-        mgr = ModelManager()
+        mgr = manager_for(backend)
         refs = mgr.install_category(category)
         for ref in refs:
             typer.echo(f"Installed {ref.qualified_name()}")

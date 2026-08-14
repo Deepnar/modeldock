@@ -5,7 +5,7 @@ from __future__ import annotations
 import typer
 
 from modeldock.cli.console import print_error
-from modeldock.core.manager import ModelManager
+from modeldock.cli.factory import manager_for
 
 
 def install_cmd(
@@ -15,7 +15,7 @@ def install_cmd(
 ) -> None:
     """Install one or more models."""
     try:
-        mgr = ModelManager()
+        mgr = manager_for(backend)
         for name in models:
             ref = mgr.install(name)
             typer.echo(f"Installed {ref.qualified_name()}")
