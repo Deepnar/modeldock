@@ -66,7 +66,6 @@ class RuntimePort(Protocol):
         ``BaseRuntime`` supplies the empty default.
         """
         raise NotImplementedError
-        ...
 
     def models_for_capability(self, capability: Capability) -> List[ModelRef]:
         """Return backend-native models exposing ``capability`` (empty by default)."""
