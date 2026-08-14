@@ -65,6 +65,7 @@ class RuntimePort(Protocol):
         list so category installs resolve to names the runtime can pull.
         ``BaseRuntime`` supplies the empty default.
         """
+        raise NotImplementedError
         ...
 
     def models_for_capability(self, capability: Capability) -> List[ModelRef]:
