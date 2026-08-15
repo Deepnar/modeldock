@@ -103,6 +103,24 @@ def install_category(category: str, backend: Optional[str] = None) -> List[Model
     return _manager().install_category(category)
 
 
+def suggest_category(category: str, backend: Optional[str] = None) -> List[ModelRef]:
+    """Preview what ``install_category`` would install, without installing.
+
+    Resolves through the active backend's own naming when it has one, so an
+    LM Studio suggestion is an LM Studio identifier rather than an Ollama tag.
+    """
+    if backend is not None:
+        return Manager(backend=backend).suggest_category(category)
+    return _manager().suggest_category(category)
+
+
+def suggest_capability(capability: str, backend: Optional[str] = None) -> List[ModelRef]:
+    """Return models exposing a capability, in the active backend's naming."""
+    if backend is not None:
+        return Manager(backend=backend).suggest_capability(capability)
+    return _manager().suggest_capability(capability)
+
+
 def update(name: str, backend: Optional[str] = None, confirm: bool = False) -> ModelRef:
     """Pull a newer tag (destructive: removes then re-downloads)."""
     if backend is not None:
@@ -186,6 +204,8 @@ __all__ = [
     "recommend",
     "install",
     "install_category",
+    "suggest_category",
+    "suggest_capability",
     "update",
     "remove",
     "verify",

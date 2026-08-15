@@ -24,7 +24,13 @@ from modeldock.core.config import ConfigService
 from modeldock.core.download import DownloadService
 from modeldock.core.lifecycle import LifecycleOrchestrator
 from modeldock.core.registry import RegistryService
-from modeldock.domain.model import Category, ModelInfo, ModelRef, RuntimeBackend
+from modeldock.domain.model import (
+    Capability,
+    Category,
+    ModelInfo,
+    ModelRef,
+    RuntimeBackend,
+)
 from modeldock.ports.cache import CachePort
 from modeldock.ports.events import EventPort
 from modeldock.ports.registry import RegistryPort
@@ -198,12 +204,49 @@ class ModelManager:
         self._download.pull(ref)
         return ref
 
-    def install_category(self, category: str) -> List[ModelRef]:
-        """Bulk-install every model in a category."""
+    def suggest_category(self, category: str) -> List[ModelRef]:
+        """Return the models ``install_category`` would install, without installing.
+
+        Prefers the active runtime's own mapping when it has one. The shared
+        catalog is built from Ollama tags, which are not valid identifiers on
+        every backend — LM Studio addresses models by Hugging Face coordinates
+        — so a runtime that names models differently supplies its own list.
+        Runtimes without a mapping fall back to the catalog unchanged.
+        """
         cat = Category.from_value(category)
+        # ``or []`` guards adapters that inherit the Protocol's stub body,
+        # which returns None rather than an empty list.
+        backend_refs = self._runtime.models_for_category(cat) or []
+        if backend_refs:
+            return list(backend_refs)
+        return [
+            ModelRef.parse(spec.name, backend=self._backend)
+            for spec in self._registry.by_category(cat)
+        ]
+
+    def suggest_capability(self, capability: str) -> List[ModelRef]:
+        """Return models exposing ``capability``, preferring the runtime's mapping."""
+        cap = Capability.from_value(capability)
+        backend_refs = self._runtime.models_for_capability(cap) or []
+        if backend_refs:
+            return list(backend_refs)
+        return [
+            ModelRef.parse(spec.name, backend=self._backend)
+            for spec in self._registry.list_all()
+            if cap in spec.capabilities
+        ]
+
+    def install_category(self, category: str) -> List[ModelRef]:
+        """Bulk-install every model in a category.
+
+        Resolves through ``suggest_category``, so each backend installs models
+        it can actually pull.
+        """
+        targets = self.suggest_category(category)
+        if not targets:
+            raise ModelNotFoundError(f"{category} (category, backend {self._backend.value})")
         refs: List[ModelRef] = []
-        for spec in self._registry.by_category(cat):
-            ref = ModelRef.parse(spec.name, backend=self._backend)
+        for ref in targets:
             self._download.pull(ref)
             refs.append(ref)
         return refs

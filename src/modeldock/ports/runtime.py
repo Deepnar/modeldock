@@ -9,7 +9,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, List, Optional, Protocol, runtime_checkable
 
-from modeldock.domain.model import ModelRef, ModelSpec, RuntimeBackend, RuntimeStatus
+from modeldock.domain.model import (
+    Capability,
+    Category,
+    ModelRef,
+    ModelSpec,
+    RuntimeBackend,
+    RuntimeStatus,
+)
 
 
 @runtime_checkable
@@ -47,6 +54,21 @@ class RuntimePort(Protocol):
 
     def default_tag_for(self, spec: ModelSpec) -> str:
         """Resolve the default variant tag for a model spec."""
+        ...
+
+    def models_for_category(self, category: Category) -> List[ModelRef]:
+        """Return backend-native models for ``category``.
+
+        Empty means "this runtime uses the shared catalog's names". Runtimes
+        whose identifiers differ from the catalog's — LM Studio addresses models
+        by Hugging Face coordinates rather than Ollama tags — return their own
+        list so category installs resolve to names the runtime can pull.
+        ``BaseRuntime`` supplies the empty default.
+        """
+        raise NotImplementedError
+
+    def models_for_capability(self, capability: Capability) -> List[ModelRef]:
+        """Return backend-native models exposing ``capability`` (empty by default)."""
         ...
 
     def status(self) -> RuntimeStatus:

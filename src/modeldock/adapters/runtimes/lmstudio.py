@@ -10,6 +10,7 @@ from __future__ import annotations
 import time
 from typing import Any, List, Optional
 
+from modeldock.adapters.runtimes import lmstudio_catalog
 from modeldock.adapters.runtimes.base import BaseRuntime
 from modeldock.common.errors import (
     DownloadError,
@@ -17,7 +18,7 @@ from modeldock.common.errors import (
     ModelNotInstalledError,
     RuntimeUnavailableError,
 )
-from modeldock.domain.model import Device, ModelRef, RuntimeBackend
+from modeldock.domain.model import Capability, Category, Device, ModelRef, RuntimeBackend
 from modeldock.ports.runtime import PullResult, RunResult
 
 _DEFAULT_HOST = "http://localhost:1234"
@@ -131,6 +132,29 @@ class LMStudioRuntime(BaseRuntime):
             return bool(response.status_code == 200)
         except Exception:
             return False
+
+    # --- backend-specific model suggestions --------------------------------
+
+    def models_for_category(self, category: Category) -> List[ModelRef]:
+        """Return curated LM Studio models for ``category``.
+
+        LM Studio addresses models by Hugging Face coordinates
+        (``publisher/repo``), not by the Ollama tags the shared catalog is built
+        from, so category installs resolve through this mapping instead. Returns
+        an empty list for a category with no curated entries, which callers
+        treat as "nothing to suggest" rather than an error. See issue #19.
+        """
+        return [
+            ModelRef.parse(entry.model_id, backend=RuntimeBackend.LM_STUDIO)
+            for entry in lmstudio_catalog.models_for_category(category)
+        ]
+
+    def models_for_capability(self, capability: Capability) -> List[ModelRef]:
+        """Return curated LM Studio models exposing ``capability``."""
+        return [
+            ModelRef.parse(entry.model_id, backend=RuntimeBackend.LM_STUDIO)
+            for entry in lmstudio_catalog.models_for_capability(capability)
+        ]
 
     def _parse_model_id(self, entry: Any) -> str:
         """Extract a model ID from a list() entry (object or dict)."""

@@ -14,7 +14,15 @@ from modeldock.common.errors import (
     RuntimeUnavailableError,
 )
 from modeldock.common.logging import get_logger
-from modeldock.domain.model import Device, ModelRef, ModelSpec, RuntimeBackend, RuntimeStatus
+from modeldock.domain.model import (
+    Capability,
+    Category,
+    Device,
+    ModelRef,
+    ModelSpec,
+    RuntimeBackend,
+    RuntimeStatus,
+)
 from modeldock.ports.runtime import PullResult, RunResult
 
 _AVAILABILITY_TTL = 5.0
@@ -174,6 +182,23 @@ class BaseRuntime:
         Concrete runtimes override this to inspect loaded-model metadata.
         """
         return Device.UNKNOWN
+
+    # --- backend-specific model suggestions --------------------------------
+
+    def models_for_category(self, category: Category) -> List[ModelRef]:
+        """Return backend-native models for ``category``.
+
+        Empty by default, meaning "this runtime has no naming of its own, use
+        the shared catalog". Runtimes whose model identifiers differ from the
+        catalog's (LM Studio addresses models by Hugging Face coordinates, not
+        Ollama tags) override this so category installs resolve to names the
+        runtime can actually pull. See issue #19.
+        """
+        return []
+
+    def models_for_capability(self, capability: Capability) -> List[ModelRef]:
+        """Return backend-native models exposing ``capability`` (empty by default)."""
+        return []
 
     def pull(self, ref: ModelRef, progress: Any = None) -> PullResult:
         """Normalized pull: checks availability, delegates to ``_do_pull``.
