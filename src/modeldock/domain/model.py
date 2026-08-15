@@ -79,6 +79,7 @@ class ModelVariant(BaseModel):
     """A specific tag/variant of a model (e.g. llama3:8b)."""
 
     tag: str
+    download_url: str | None = None
     params: Optional[str] = None
     size_bytes: Optional[int] = None
     min_ram: Optional[str] = None
