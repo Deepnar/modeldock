@@ -45,6 +45,10 @@ _HOST_CANDIDATES = (
 # LM Studio server that is actually up.
 _PROBE_PATH = "/v1/models"
 
+# Actionable next step for beginners when the server can't be reached, rather
+# than a raw connection stack trace. See issue #20.
+_SERVER_NOT_RUNNING_HINT = "Start LM Studio and enable the local server."
+
 
 class LMStudioRuntime(BaseRuntime):
     """Runtime adapter for LM Studio."""
@@ -132,6 +136,17 @@ class LMStudioRuntime(BaseRuntime):
             return bool(response.status_code == 200)
         except Exception:
             return False
+
+    def _require_available(self) -> None:
+        """Raise a clear, typed error if the LM Studio server isn't reachable.
+
+        ``list_installed``/``_check_available`` degrade to False/[] on a down
+        server so read-only status checks stay quiet, but operations that
+        actually need the server (run, remove) must fail loudly instead of
+        surfacing a misleading downstream error like "model not installed".
+        """
+        if not self.is_available():
+            raise RuntimeUnavailableError("lmstudio", hint=_SERVER_NOT_RUNNING_HINT)
 
     # --- backend-specific model suggestions --------------------------------
 
@@ -297,6 +312,7 @@ class LMStudioRuntime(BaseRuntime):
                     "cannot be removed locally."
                 ),
             )
+        self._require_available()
 
         model_id = ref.qualified_name()
         try:
@@ -334,6 +350,7 @@ class LMStudioRuntime(BaseRuntime):
         from stdin until EOF or a quit command. Requires the model to be
         installed locally.
         """
+        self._require_available()
         if not self.is_installed(ref):
             raise ModelNotInstalledError(ref.qualified_name())
         client = self._ensure_client()
