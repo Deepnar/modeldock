@@ -9,17 +9,21 @@ import pytest
 
 from modeldock.adapters.downloaders.http import HttpDownloader
 from modeldock.common.errors import DownloadError
-from modeldock.domain.model import Category, ModelSpec
+from modeldock.domain.model import Category, ModelSpec, ModelVariant
 
 
-class _SpecWithUrl(ModelSpec):
-    """ModelSpec carrying the download URL the HTTP downloader expects."""
-
-    download_url: str = ""
-
-
-def _spec(url: str = "https://example.invalid/model.gguf") -> _SpecWithUrl:
-    return _SpecWithUrl(name="demo", category=Category.CHAT, download_url=url)
+def _spec(url: str = "https://example.com/model.gguf") -> ModelSpec:
+    return ModelSpec(
+        name="demo",
+        category=Category.CHAT,
+        variants=[
+            ModelVariant(
+                tag="latest",
+                download_url=url,
+            )
+        ],
+        default_tag="latest",
+    )
 
 
 class _FakeResponse:
@@ -124,3 +128,37 @@ def test_download_restarts_on_range_not_satisfiable(tmp_path: Path, patch_client
 def test_download_without_url_raises(tmp_path: Path) -> None:
     with pytest.raises(DownloadError):
         HttpDownloader().download(_spec(url=""), tmp_path / "model.gguf")
+
+
+def test_uses_download_url_from_default_variant(tmp_path) -> None:
+    spec = ModelSpec(
+        name="demo",
+        category=Category.CHAT,
+        default_tag="70b",
+        variants=[
+            ModelVariant(
+                tag="8b",
+                download_url="https://example.com/model-8b.gguf",
+            ),
+            ModelVariant(
+                tag="70b",
+                download_url="https://example.com/model-70b.gguf",
+            ),
+        ],
+    )
+
+    assert HttpDownloader._url_for(spec) == "https://example.com/model-70b.gguf"
+
+
+def test_missing_variant_download_url_raises() -> None:
+    spec = ModelSpec(
+        name="demo",
+        category=Category.CHAT,
+        default_tag="latest",
+        variants=[
+            ModelVariant(tag="latest"),
+        ],
+    )
+
+    with pytest.raises(DownloadError, match="No download_url"):
+        HttpDownloader._url_for(spec)
