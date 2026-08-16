@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 
 from modeldock.adapters.runtimes.lmstudio import LMStudioRuntime
-from modeldock.common.errors import DownloadError, ModelNotInstalledError
+from modeldock.common.errors import DownloadError, ModelNotInstalledError, RuntimeUnavailableError
 from modeldock.domain.model import Device, ModelRef, RuntimeBackend, RuntimeStatus
 
 
@@ -359,6 +359,20 @@ def test_remove_fails_for_cloud_model() -> None:
     assert http_client.post_calls == []
 
 
+def test_remove_raises_runtime_unavailable_when_server_down() -> None:
+    """Test remove raises a typed, actionable error when the server is unreachable."""
+    http_client = MagicMock()
+    http_client.get.side_effect = RuntimeError("connection refused")
+    runtime = _runtime_with_http_client(http_client)
+    ref = ModelRef(name="qwen/qwen3.5-9b", tag="latest", backend=RuntimeBackend.LM_STUDIO)
+
+    with pytest.raises(RuntimeUnavailableError) as exc_info:
+        runtime.remove(ref)
+    assert "Start LM Studio and enable the local server." in str(exc_info.value)
+    # No unload attempted once the server is known to be down.
+    http_client.post.assert_not_called()
+
+
 def test_remove_suggests_ui_when_unload_fails() -> None:
     """Test remove suggests using UI when unload fails."""
     http_client = MagicMock()
@@ -393,6 +407,20 @@ def test_run_single_prompt_streams_tokens() -> None:
     assert result.success is True
     assert result.completion_tokens == 2
     assert "".join(written) == "Hello world\n"
+
+
+def test_run_raises_runtime_unavailable_when_server_down() -> None:
+    """Test run raises a typed, actionable error when the server is unreachable."""
+    http_client = MagicMock()
+    http_client.get.side_effect = RuntimeError("connection refused")
+    runtime = _runtime_with_http_client(http_client)
+
+    with pytest.raises(RuntimeUnavailableError) as exc_info:
+        runtime.run(
+            ModelRef(name="qwen/qwen3.5-9b", tag="latest", backend=RuntimeBackend.LM_STUDIO),
+            prompt="hi",
+        )
+    assert "Start LM Studio and enable the local server." in str(exc_info.value)
 
 
 def test_run_raises_when_model_not_installed() -> None:
