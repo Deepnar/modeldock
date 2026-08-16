@@ -32,6 +32,10 @@ pluggable runtime adapters. It does **not** run inference itself; it orchestrate
 runtimes (starting with Ollama). No more manual `ollama pull` commands — just
 write `md.load("llama3")` and ModelDock handles the rest.
 
+<p align="center">
+  <img src="docs/images/demo.gif" alt="ModelDock demo: installing modeldock, loading a model with the Python SDK, and browsing models with the CLI" width="720">
+</p>
+
 ## Features
 
 - **Python-first API** — `md.load("llama3")` auto-installs if missing and returns a ready client.
