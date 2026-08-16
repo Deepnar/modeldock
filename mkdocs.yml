@@ -84,6 +84,7 @@ nav:
     - CLI Reference: sdk/cli.md
     - Ollama Integration: sdk/ollama.md
     - LM Studio Integration: sdk/lmstudio.md
+    - llama.cpp Integration: sdk/llamacpp.md
   - Architecture:
     - Design Overview: architecture/overview.md
     - Clean Architecture: architecture/clean-architecture.md
