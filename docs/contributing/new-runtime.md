@@ -107,6 +107,42 @@ The extension is self-contained. Do not modify:
 
 ---
 
+## Step 6 (optional): Add a Live Catalog Provider
+
+If the runtime has its own online model catalog (or one it borrows, like LM
+Studio and llama.cpp both borrowing the Hugging Face Hub), you can wire it
+into `md.search()`/`md.list()`/`md.recommend()` the same way — one more
+entry-point line, no core edits:
+
+```toml
+[project.entry-points."modeldock.catalog_providers"]
+lmstudio = "modeldock_lmstudio.catalog:build_catalog"
+```
+
+The entry point resolves to a callable `(cache_dir: Path) -> RegistryPort` —
+a plain function, or a class whose constructor takes only `cache_dir`:
+
+```python
+# modeldock_lmstudio/catalog.py
+from pathlib import Path
+from modeldock.ports.registry import RegistryPort
+
+def build_catalog(cache_dir: Path) -> RegistryPort:
+    """Return a RegistryPort backed by this runtime's own catalog."""
+    return MyLiveCatalog(cache_dir)
+```
+
+`ModelManager._resolve_backend_catalog` resolves it through
+`CatalogProviderRegistry` (`adapters/registry/catalog_registry.py`) and
+merges it with the general catalog via `CompositeRegistry`, so results
+surface alongside the shared Ollama-named catalog rather than replacing it.
+Without a catalog provider, the runtime's `models_for_category`/
+`models_for_capability` (Step 1) still work for `install_category()` — this
+step only affects general discovery. See Architecture.md §9/§14 and
+`adapters/registry/huggingface_catalog.py` for a real example.
+
+---
+
 ## Extension Checklist
 
 - [ ] Create `modeldock/adapters/runtimes/<name>.py` implementing `RuntimePort`
@@ -114,6 +150,7 @@ The extension is self-contained. Do not modify:
 - [ ] Add entry point in `pyproject.toml`
 - [ ] Add/extend port-contract tests
 - [ ] Document backend-specific notes
+- [ ] (Optional) Add a `modeldock.catalog_providers` entry point for live discovery
 - [ ] Do NOT touch `core/`, `cli/`, or public API
 
 ---

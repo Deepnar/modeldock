@@ -76,6 +76,30 @@ every source relevant to the active backend, not just Ollama's.
   `"bundled"` remain explicit single-source opt-outs with no merge and no
   extra network calls, unchanged from before
 
+---
+
+Third-party catalog plugins: live catalog sources are now as pluggable as
+runtimes, via the same entry-point mechanism.
+
+### Added
+
+- `CatalogProviderRegistry` (`adapters/registry/catalog_registry.py`) —
+  resolves a `RuntimeBackend` to its own live catalog: built-ins (Hugging
+  Face for LM Studio/llama.cpp) plus third-party plugins discovered via the
+  `modeldock.catalog_providers` entry-point group, mirroring how
+  `RuntimeRegistry` already discovers third-party `modeldock.runtimes`
+  plugins. A plugin is a callable `(cache_dir: Path) -> RegistryPort`; entry
+  points take priority over built-ins, so a plugin can also replace the
+  shipped Hugging Face provider
+
+### Changed
+
+- `ModelManager._resolve_backend_catalog` now resolves through
+  `CatalogProviderRegistry` instead of hardcoding
+  `HuggingFaceCatalogProvider`/a fixed backend allowlist — behavior for LM
+  Studio/llama.cpp is unchanged, but any backend with a registered catalog
+  plugin (built-in or third-party) is now picked up automatically
+
 ## [0.1.3] - 2026-07-19
 
 Dynamic catalog: replaced static `catalog.json` with live scraping of ollama.com.

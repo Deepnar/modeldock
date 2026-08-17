@@ -382,10 +382,12 @@ A **searchable, versioned catalog** decoupled from any runtime.
   are explicit single-source opt-outs with no network beyond that one source.
   `"auto"` (default) tries dynamic Ollama, falls back to bundled, **and**
   merges in the active backend's own live catalog when it has one —
-  `ModelManager._resolve_backend_catalog` returns a `HuggingFaceCatalogProvider`
-  for LM Studio/llama.cpp backends, wrapped together with the general catalog
-  in a `CompositeRegistry`. Backends without a catalog of their own (Ollama)
-  are unaffected — no composite is built, exactly as before.
+  `ModelManager._resolve_backend_catalog` resolves it through
+  `CatalogProviderRegistry` (built-in `HuggingFaceCatalogProvider` for LM
+  Studio/llama.cpp, or a third-party plugin — see §14), wrapped together with
+  the general catalog in a `CompositeRegistry`. Backends without a catalog of
+  their own (Ollama) are unaffected — no composite is built, exactly as
+  before.
 - **Alias resolution:** `domain/alias.py` maps friendly names (`llama3`) →
   canonical `ModelSpec`. Handles version shortcuts (`llama3:8b`),
   capability-based lookup (`recommend("vision")`), and "auto model selection."
@@ -517,10 +519,26 @@ Two complementary mechanisms:
    `after_install`, `on_error`) allow user-supplied callbacks/plugins (e.g.,
    notify on download complete, custom verification).
 
-4. **Registry plugins:** `RemoteRegistry` and future community catalogs plug
-   into `RegistryPort` the same way.
+4. **Catalog-provider plugins:** live catalog sources use the identical
+   entry-point pattern as runtimes, via `CatalogProviderRegistry`
+   (`adapters/registry/catalog_registry.py`):
+   ```
+   [project.entry-points."modeldock.catalog_providers"]
+   vllm = "modeldock_vllm.catalog:build_catalog"
+   ```
+   The entry point resolves to a callable `(cache_dir: Path) -> RegistryPort`
+   — a plain function or a one-argument class constructor. `ModelManager`
+   resolves the active backend's own live catalog through this registry
+   (`_resolve_backend_catalog`) and merges it into general discovery via
+   `CompositeRegistry`, so `modeldock-vllm` can add live model discovery for
+   vLLM with zero changes to core, exactly like adding a new runtime. Entry
+   points take priority over built-ins (Hugging Face for LM Studio/llama.cpp),
+   so a plugin can also replace a shipped catalog source. `RemoteRegistry`
+   (a single arbitrary URL/JSON source) remains available as a simpler,
+   non-plugin option for community catalog updates without a package release.
 
-This means adding vLLM later = write one adapter class + one entry-point line.
+This means adding vLLM later = write one adapter class + one entry-point line
+(plus, optionally, one catalog-provider entry-point line for live discovery).
 Core, CLI, API, and tests are untouched.
 
 ---

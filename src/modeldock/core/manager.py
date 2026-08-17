@@ -135,23 +135,17 @@ class ModelManager:
     def _resolve_backend_catalog(self, cfg: Settings) -> Optional[RegistryPort]:
         """The active backend's own live catalog, or None when it has none.
 
-        Only LM Studio and llama.cpp are addressable through the Hugging Face
-        Hub rather than the shared Ollama-scraped catalog. Failures (no
-        network, no cache) degrade to None rather than raising, exactly like
-        the general catalog's own fallback.
+        Resolved through ``CatalogProviderRegistry``, which knows the
+        built-in mapping (Hugging Face for LM Studio/llama.cpp) and discovers
+        third-party ``modeldock.catalog_providers`` plugins for any other
+        backend — a package can add live discovery for a new runtime without
+        any change to ModelDock itself. Failures (no network, no cache, no
+        catalog for this backend at all) all degrade to None rather than
+        raising, exactly like the general catalog's own fallback.
         """
-        from modeldock.adapters.registry.huggingface_catalog import (
-            SUPPORTED_BACKENDS,
-            HuggingFaceCatalogProvider,
-        )
+        from modeldock.adapters.registry.catalog_registry import CatalogProviderRegistry
 
-        if self._backend not in SUPPORTED_BACKENDS:
-            return None
-        try:
-            return HuggingFaceCatalogProvider(cfg.cache_dir, self._backend)
-        except Exception as exc:
-            self._logger.debug("Hugging Face catalog unavailable (%s)", exc)
-            return None
+        return CatalogProviderRegistry().get(self._backend, cfg.cache_dir)
 
     #: Config field holding the host override for each backend that has one.
     _HOST_SETTING_FOR = {
