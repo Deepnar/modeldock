@@ -8,7 +8,9 @@ hide:
 
 <div class="hero-banner" markdown>
 
-<img src="images/modeldock.png" alt="ModelDock" width="320" style="margin-bottom: 1rem;">
+<div class="hero-logo-tile"><img src="images/modeldock.png" alt="ModelDock"></div>
+
+<div class="hero-eyebrow" markdown>:material-tag-outline: v0.1.3 &nbsp;·&nbsp; MIT Licensed &nbsp;·&nbsp; Open Source</div>
 
 ### The package manager for local AI models
 
@@ -19,6 +21,21 @@ Lightweight. Python-first. Zero-config.
 [Get Started](getting-started/quickstart.md){ .md-button .md-button--primary }
 [View on GitHub](https://github.com/OpenAgentHQ/modeldock){ .md-button }
 
+</div>
+
+---
+
+## See It In Action
+
+pip install, load a model through the Python SDK, and browse the catalog from the CLI — end to end in under a minute.
+
+<div class="demo-frame" markdown>
+<div class="demo-frame__titlebar">
+  <span class="demo-frame__dot demo-frame__dot--red"></span>
+  <span class="demo-frame__dot demo-frame__dot--yellow"></span>
+  <span class="demo-frame__dot demo-frame__dot--green"></span>
+</div>
+![ModelDock demo: installing modeldock, loading a model with the Python SDK, and browsing models with the CLI](images/demo.gif)
 </div>
 
 ---
@@ -167,8 +184,8 @@ Common:      modeldock/common/ (config, logging, platform, http, errors)
 | Runtime    | Status | Notes |
 |------------|--------|-------|
 | Ollama     | :material-check-circle:{ style="color: #4caf50" } Shipped | First runtime, fully supported |
-| LM Studio  | :material-clock-outline:{ style="color: #ff9800" } Planned | Drop-in adapter |
-| llama.cpp  | :material-clock-outline:{ style="color: #ff9800" } Planned | Drop-in adapter |
+| LM Studio  | :material-check-circle:{ style="color: #4caf50" } Shipped | OpenAI-compatible local server adapter |
+| llama.cpp  | :material-check-circle:{ style="color: #4caf50" } Shipped | `llama-server` OpenAI-compatible adapter |
 | Jan AI     | :material-clock-outline:{ style="color: #ff9800" } Planned | Drop-in adapter |
 | GPT4All    | :material-clock-outline:{ style="color: #ff9800" } Planned | Drop-in adapter |
 | vLLM       | :material-clock-outline:{ style="color: #ff9800" } Planned | Drop-in adapter |

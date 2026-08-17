@@ -77,6 +77,109 @@
   margin: 0 auto;
 }
 
+/* Buttons sit on a dark gradient regardless of light/dark scheme, so give
+   both variants their own contrast instead of inheriting the page palette. */
+.hero-banner .md-button {
+  margin: 0.3rem;
+  border-color: rgba(255, 255, 255, 0.55);
+  color: #ffffff;
+}
+
+.hero-banner .md-button:hover {
+  border-color: #ffffff;
+  color: #ffffff;
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.hero-banner .md-button--primary {
+  background-color: var(--md-accent-fg-color);
+  border-color: var(--md-accent-fg-color);
+  color: #ffffff;
+}
+
+.hero-banner .md-button--primary:hover {
+  background-color: transparent;
+  border-color: var(--md-accent-fg-color);
+  color: var(--md-accent-fg-color);
+}
+
+/* Logo sits on a white tile so its opaque background reads as a deliberate
+   badge rather than a stray box against the dark hero gradient. */
+.hero-logo-tile {
+  display: inline-flex;
+  background: #ffffff;
+  border-radius: 1.5rem;
+  padding: 0.85rem;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+  margin-bottom: 1.25rem;
+}
+
+.hero-logo-tile img {
+  display: block;
+  width: 84px;
+  height: 84px;
+  margin: 0;
+}
+
+/* Small pill above the headline (version / status). */
+.hero-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.3em 0.9em;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #eceff1;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  margin-bottom: 1rem;
+}
+
+/* ── Demo Media (embedded product GIF/screenshots) ──────────────────────── */
+
+.md-typeset .demo-frame {
+  max-width: 900px;
+  margin: 1.5rem auto 2.5rem;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--md-default-fg-color--lightest, #e0e0e0);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12);
+  background: #0d1117;
+}
+
+[data-md-color-scheme="slate"] .md-typeset .demo-frame {
+  border-color: #37474f;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+}
+
+.demo-frame__titlebar {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.6rem 0.8rem;
+  background: #161b22;
+}
+
+.demo-frame__dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.demo-frame__dot--red { background: #ff5f56; }
+.demo-frame__dot--yellow { background: #ffbd2e; }
+.demo-frame__dot--green { background: #27c93f; }
+
+.demo-frame img {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 0;
+}
+
 /* ── Feature Grid ────────────────────────────────────────────────────────── */
 
 .md-typeset .feature-grid {
@@ -187,6 +290,47 @@
 
 .md-footer {
   background-color: var(--md-primary-fg-color--dark);
+}
+
+/* Prev/next page pagination (navigation.footer) */
+.md-footer__link {
+  transition: opacity 0.2s;
+}
+
+.md-footer__link:hover {
+  opacity: 0.75;
+}
+
+.md-footer-meta {
+  background-color: var(--md-primary-fg-color--dark);
+}
+
+.md-footer-meta__inner {
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+}
+
+.md-copyright {
+  font-size: 0.72rem;
+  opacity: 0.85;
+}
+
+.md-copyright a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 255, 255, 0.35);
+}
+
+.md-social {
+  padding-top: 0.2rem;
+}
+
+.md-social__link {
+  transition: transform 0.15s;
+}
+
+.md-social__link:hover {
+  transform: translateY(-2px);
 }
 
 /* ── Sidebar ─────────────────────────────────────────────────────────────── */

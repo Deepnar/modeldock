@@ -21,21 +21,25 @@ copyright: >-
 theme:
   name: material
   language: en
+  logo: images/logo-header.png
+  favicon: images/modeldock.png
   palette:
-    # Dark mode (default — industrial, focused)
-    - scheme: default
+    # Light mode — respects the OS preference on first visit
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
       primary: blue grey
       accent: teal
       toggle:
         icon: material/brightness-7
-        name: Switch to light mode
-    # Light mode
-    - scheme: slate
+        name: Switch to dark mode
+    # Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
       primary: blue grey
       accent: teal
       toggle:
         icon: material/brightness-4
-        name: Switch to dark mode
+        name: Switch to light mode
 
   font:
     text: Inter
@@ -43,16 +47,18 @@ theme:
 
   icon:
     repo: fontawesome/brands/github
-    logo: material/package-variant-closed
 
   features:
     - navigation.instant
+    - navigation.instant.progress
     - navigation.tracking
     - navigation.tabs
+    - navigation.tabs.sticky
     - navigation.sections
     - navigation.expand
     - navigation.path
     - navigation.top
+    - navigation.footer
     - navigation.indexes
     - search.suggest
     - search.highlight
@@ -61,6 +67,9 @@ theme:
     - content.code.annotate
     - content.code.select
     - content.tabs.link
+    - content.action.edit
+    - content.action.view
+    - content.tooltips
     - toc.follow
     - toc.integrate
 
@@ -127,6 +136,9 @@ markdown_extensions:
   - pymdownx.keys
   - pymdownx.tasklist:
       custom_checkbox: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - attr_list
   - md_in_html
   - def_list
