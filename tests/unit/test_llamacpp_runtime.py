@@ -196,6 +196,89 @@ def test_is_installed_false_when_model_absent() -> None:
     assert runtime.is_installed(ref) is False
 
 
+# --- GGUF path resolution tests -------------------------------------------------
+
+
+def test_list_installed_parses_unix_gguf_path_without_splitting_on_colon() -> None:
+    http_client = _MockHTTPClient(
+        models_response={"data": [{"id": "/models/llama-3-8b-instruct.Q4_K_M.gguf"}]}
+    )
+    runtime = _runtime_with_http_client(http_client)
+
+    refs = runtime.list_installed()
+
+    assert len(refs) == 1
+    assert refs[0].name == "/models/llama-3-8b-instruct.Q4_K_M.gguf"
+    assert refs[0].tag == "latest"
+
+
+def test_list_installed_parses_windows_gguf_path_without_splitting_on_drive_colon() -> None:
+    http_client = _MockHTTPClient(
+        models_response={"data": [{"id": r"C:\models\llama-3-8b-instruct.Q4_K_M.gguf"}]}
+    )
+    runtime = _runtime_with_http_client(http_client)
+
+    refs = runtime.list_installed()
+
+    assert len(refs) == 1
+    assert refs[0].name == r"C:\models\llama-3-8b-instruct.Q4_K_M.gguf"
+    assert refs[0].tag == "latest"
+
+
+def test_list_installed_still_parses_non_path_alias_as_name_tag() -> None:
+    http_client = _MockHTTPClient(models_response={"data": [{"id": "qwen2.5-7b-instruct:latest"}]})
+    runtime = _runtime_with_http_client(http_client)
+
+    refs = runtime.list_installed()
+
+    assert refs[0].name == "qwen2.5-7b-instruct"
+    assert refs[0].tag == "latest"
+
+
+def test_is_installed_matches_bare_filename_against_full_path() -> None:
+    http_client = _MockHTTPClient(
+        models_response={"data": [{"id": "/models/llama-3-8b-instruct.Q4_K_M.gguf"}]}
+    )
+    runtime = _runtime_with_http_client(http_client)
+
+    ref = ModelRef.parse("llama-3-8b-instruct.Q4_K_M.gguf")
+
+    assert runtime.is_installed(ref) is True
+
+
+def test_is_installed_matches_filename_without_gguf_extension() -> None:
+    http_client = _MockHTTPClient(
+        models_response={"data": [{"id": "/models/llama-3-8b-instruct.Q4_K_M.gguf"}]}
+    )
+    runtime = _runtime_with_http_client(http_client)
+
+    ref = ModelRef.parse("llama-3-8b-instruct.Q4_K_M")
+
+    assert runtime.is_installed(ref) is True
+
+
+def test_is_installed_matches_windows_path_against_unix_style_reference() -> None:
+    http_client = _MockHTTPClient(
+        models_response={"data": [{"id": r"C:\models\llama-3-8b-instruct.Q4_K_M.gguf"}]}
+    )
+    runtime = _runtime_with_http_client(http_client)
+
+    ref = ModelRef.parse("llama-3-8b-instruct.Q4_K_M.gguf")
+
+    assert runtime.is_installed(ref) is True
+
+
+def test_is_installed_false_for_unrelated_filename() -> None:
+    http_client = _MockHTTPClient(
+        models_response={"data": [{"id": "/models/llama-3-8b-instruct.Q4_K_M.gguf"}]}
+    )
+    runtime = _runtime_with_http_client(http_client)
+
+    ref = ModelRef.parse("mistral-7b.Q4_K_M.gguf")
+
+    assert runtime.is_installed(ref) is False
+
+
 # --- pull tests ----------------------------------------------------------------
 
 
