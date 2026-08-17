@@ -370,9 +370,22 @@ A **searchable, versioned catalog** decoupled from any runtime.
   - `BundledRegistry` — reads `catalog.json` (offline fallback).
   - `RemoteRegistry` — optional fetch/refresh from a URL/JSON for community
     updates without a package release.
+  - `CompositeRegistry` (`adapters/registry/composite.py`) — merges an
+    ordered list of `RegistryPort` sources into one: `search`/`list_all`/
+    `by_category`/`recommend` union every source's results (earlier source
+    wins on a name collision), and `get()` returns the first source that
+    resolves the reference. Used so general discovery surfaces models the
+    *active* backend can actually install, not just the Ollama-named shared
+    catalog.
 - **Configuration:** `catalog_source` setting in `Settings` controls which
-  registry is used: `"auto"` (try dynamic, fallback to bundled), `"ollama"`
-  (dynamic only), `"bundled"` (static only).
+  registry is used: `"ollama"` (dynamic only) and `"bundled"` (static only)
+  are explicit single-source opt-outs with no network beyond that one source.
+  `"auto"` (default) tries dynamic Ollama, falls back to bundled, **and**
+  merges in the active backend's own live catalog when it has one —
+  `ModelManager._resolve_backend_catalog` returns a `HuggingFaceCatalogProvider`
+  for LM Studio/llama.cpp backends, wrapped together with the general catalog
+  in a `CompositeRegistry`. Backends without a catalog of their own (Ollama)
+  are unaffected — no composite is built, exactly as before.
 - **Alias resolution:** `domain/alias.py` maps friendly names (`llama3`) →
   canonical `ModelSpec`. Handles version shortcuts (`llama3:8b`),
   capability-based lookup (`recommend("vision")`), and "auto model selection."

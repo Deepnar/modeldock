@@ -53,6 +53,29 @@ for llama.cpp, nothing at all).
 - `LMStudioRuntime`/`LlamaCppRuntime` accept an optional `cache_dir` argument
   (defaults to the standard ModelDock cache directory)
 
+---
+
+Composite catalog: general discovery (`search`/`list`/`recommend`) now spans
+every source relevant to the active backend, not just Ollama's.
+
+### Added
+
+- `CompositeRegistry` (`adapters/registry/composite.py`) — merges an ordered
+  list of `RegistryPort` sources; earlier sources win on a name collision,
+  `get()` returns the first source that resolves the reference
+
+### Changed
+
+- `ModelManager._resolve_registry` under `catalog_source="auto"` (the
+  default) now merges the active backend's own live catalog with the general
+  one when it has one — LM Studio/llama.cpp get a `CompositeRegistry` of
+  `[HuggingFaceCatalogProvider, <ollama-or-bundled>]`, so `md.search()`/
+  `md.list()`/`md.recommend()` surface models that backend can actually
+  install. Ollama (and any backend without its own catalog) is unaffected —
+  no composite is built, exactly as before. `catalog_source="ollama"` /
+  `"bundled"` remain explicit single-source opt-outs with no merge and no
+  extra network calls, unchanged from before
+
 ## [0.1.3] - 2026-07-19
 
 Dynamic catalog: replaced static `catalog.json` with live scraping of ollama.com.

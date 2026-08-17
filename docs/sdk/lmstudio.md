@@ -79,6 +79,16 @@ instead of the live one.
 Backends whose names already match the catalog (Ollama) are unaffected and
 continue to install the full category.
 
+### General discovery includes the live Hugging Face catalog too
+
+It's not just category/capability installs: `mgr.list()`, `mgr.search()`,
+and `mgr.recommend()` also merge in the live Hugging Face catalog when
+`catalog_source` is left at its default, `"auto"`. So on the LM Studio
+backend, `md.search("coding")` returns real, installable GGUF repos
+alongside the general Ollama-named catalog — not just what Ollama happens to
+have. Set `catalog_source="bundled"` or `"ollama"` to opt out of the merge
+and get a single, explicit source instead.
+
 ### Downloads may need the desktop app
 
 LM Studio manages model storage itself. ModelDock tries the local server's

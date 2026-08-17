@@ -50,6 +50,13 @@ than a guess. `install_category()` still cannot actually download anything
 real, pastable `--hf-repo` coordinates instead of Ollama tags that mean
 nothing to `llama-server`.
 
+General discovery gets the same treatment: with `catalog_source` left at its
+default (`"auto"`), `mgr.list()`/`mgr.search()`/`mgr.recommend()` merge the
+live Hugging Face catalog with the general Ollama-named one, so results
+include real `--hf-repo` coordinates rather than only Ollama tags. Set
+`catalog_source="bundled"` or `"ollama"` for a single, explicit source with
+no live Hugging Face lookup.
+
 ### `install()` fails with an actionable message
 
 Because there is no network API to fetch a model into a running server,

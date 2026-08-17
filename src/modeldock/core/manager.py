@@ -84,7 +84,17 @@ class ModelManager:
     # --- resolution helpers ----------------------------------------------
 
     def _resolve_registry(self, cfg: Settings) -> RegistryPort:
-        """Resolve which registry adapter to use based on catalog_source."""
+        """Resolve which registry adapter to use based on catalog_source.
+
+        Under ``"auto"``, the general catalog (Ollama live, falling back to
+        bundled) is additionally merged with the active backend's own live
+        catalog when it has one — LM Studio and llama.cpp are addressable
+        through the Hugging Face Hub, not Ollama tags, so discovery
+        (``search``/``list``/``recommend``) would otherwise surface names the
+        active backend cannot actually install. ``"bundled"``/``"ollama"``
+        stay single-source and network-free/live-only respectively, exactly
+        as before — they are explicit opt-outs of this merge.
+        """
         source = cfg.catalog_source
         if source == "bundled":
             from modeldock.adapters.registry.bundled import BundledRegistry
@@ -94,23 +104,54 @@ class ModelManager:
             from modeldock.adapters.registry.ollama_library import OllamaLibraryRegistry
 
             return OllamaLibraryRegistry(cache_dir=cfg.cache_dir)
-        else:  # "auto" — try ollama, fallback to bundled
-            from modeldock.adapters.registry.bundled import BundledRegistry
+        else:  # "auto" — try ollama, fallback to bundled; merge in a backend catalog
+            base = self._resolve_auto_registry(cfg)
+            backend_catalog = self._resolve_backend_catalog(cfg)
+            if backend_catalog is None:
+                return base
+            from modeldock.adapters.registry.composite import CompositeRegistry
 
-            try:
-                from modeldock.adapters.registry.ollama_library import OllamaLibraryRegistry
+            return CompositeRegistry([backend_catalog, base])
 
-                live = OllamaLibraryRegistry(cache_dir=cfg.cache_dir)
-            except Exception as exc:
-                self._logger.debug("Live catalog unavailable (%s); using bundled", exc)
-                return BundledRegistry()
-            # The live registry swallows network errors and constructs with an
-            # empty index when there is neither network nor cache, so an
-            # exception is not the only failure mode we must fall back from.
-            if not live.list_all():
-                self._logger.info("Live catalog empty; falling back to the bundled catalog")
-                return BundledRegistry()
-            return live
+    def _resolve_auto_registry(self, cfg: Settings) -> RegistryPort:
+        """The general catalog for ``"auto"``: live Ollama, falling back to bundled."""
+        from modeldock.adapters.registry.bundled import BundledRegistry
+
+        try:
+            from modeldock.adapters.registry.ollama_library import OllamaLibraryRegistry
+
+            live = OllamaLibraryRegistry(cache_dir=cfg.cache_dir)
+        except Exception as exc:
+            self._logger.debug("Live catalog unavailable (%s); using bundled", exc)
+            return BundledRegistry()
+        # The live registry swallows network errors and constructs with an
+        # empty index when there is neither network nor cache, so an
+        # exception is not the only failure mode we must fall back from.
+        if not live.list_all():
+            self._logger.info("Live catalog empty; falling back to the bundled catalog")
+            return BundledRegistry()
+        return live
+
+    def _resolve_backend_catalog(self, cfg: Settings) -> Optional[RegistryPort]:
+        """The active backend's own live catalog, or None when it has none.
+
+        Only LM Studio and llama.cpp are addressable through the Hugging Face
+        Hub rather than the shared Ollama-scraped catalog. Failures (no
+        network, no cache) degrade to None rather than raising, exactly like
+        the general catalog's own fallback.
+        """
+        from modeldock.adapters.registry.huggingface_catalog import (
+            SUPPORTED_BACKENDS,
+            HuggingFaceCatalogProvider,
+        )
+
+        if self._backend not in SUPPORTED_BACKENDS:
+            return None
+        try:
+            return HuggingFaceCatalogProvider(cfg.cache_dir, self._backend)
+        except Exception as exc:
+            self._logger.debug("Hugging Face catalog unavailable (%s)", exc)
+            return None
 
     #: Config field holding the host override for each backend that has one.
     _HOST_SETTING_FOR = {
