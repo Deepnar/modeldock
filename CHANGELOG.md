@@ -26,6 +26,80 @@ duplicating caching/indexing logic per source.
   duplicating the fetch/cache/index/`RegistryPort` logic inline; scraping,
   auto-detection, and caching behavior are unchanged
 
+---
+
+Live GGUF catalog: LM Studio and llama.cpp category/capability suggestions now
+come from the Hugging Face Hub instead of a hand-maintained static list (or,
+for llama.cpp, nothing at all).
+
+### Added
+
+- `HuggingFaceCatalogProvider` (`adapters/registry/huggingface_catalog.py`) —
+  live catalog built on `CachedCatalogRegistry` that queries the Hugging Face
+  Hub API (`filter=gguf`) for GGUF-format models, cached 24h; LM Studio and
+  llama.cpp share one on-disk cache since both address the same GGUF universe
+- `LlamaCppRuntime.models_for_category`/`models_for_capability` — llama.cpp
+  had no catalog of any kind before; category/capability installs previously
+  fell back to the shared Ollama-tag catalog, whose names are not valid
+  `--hf-repo` coordinates
+
+### Changed
+
+- `LMStudioRuntime.models_for_category`/`models_for_capability` now query the
+  live Hugging Face catalog first, falling back to the existing curated
+  `lmstudio_catalog.py` table only when the Hub is unreachable and no cache
+  exists yet — suggestions still work fully offline, they just may be a
+  shorter, point-in-time list instead of the live one
+- `LMStudioRuntime`/`LlamaCppRuntime` accept an optional `cache_dir` argument
+  (defaults to the standard ModelDock cache directory)
+
+---
+
+Composite catalog: general discovery (`search`/`list`/`recommend`) now spans
+every source relevant to the active backend, not just Ollama's.
+
+### Added
+
+- `CompositeRegistry` (`adapters/registry/composite.py`) — merges an ordered
+  list of `RegistryPort` sources; earlier sources win on a name collision,
+  `get()` returns the first source that resolves the reference
+
+### Changed
+
+- `ModelManager._resolve_registry` under `catalog_source="auto"` (the
+  default) now merges the active backend's own live catalog with the general
+  one when it has one — LM Studio/llama.cpp get a `CompositeRegistry` of
+  `[HuggingFaceCatalogProvider, <ollama-or-bundled>]`, so `md.search()`/
+  `md.list()`/`md.recommend()` surface models that backend can actually
+  install. Ollama (and any backend without its own catalog) is unaffected —
+  no composite is built, exactly as before. `catalog_source="ollama"` /
+  `"bundled"` remain explicit single-source opt-outs with no merge and no
+  extra network calls, unchanged from before
+
+---
+
+Third-party catalog plugins: live catalog sources are now as pluggable as
+runtimes, via the same entry-point mechanism.
+
+### Added
+
+- `CatalogProviderRegistry` (`adapters/registry/catalog_registry.py`) —
+  resolves a `RuntimeBackend` to its own live catalog: built-ins (Hugging
+  Face for LM Studio/llama.cpp) plus third-party plugins discovered via the
+  `modeldock.catalog_providers` entry-point group, mirroring how
+  `RuntimeRegistry` already discovers third-party `modeldock.runtimes`
+  plugins. A plugin is a callable `(cache_dir: Path) -> RegistryPort`; entry
+  points take priority over built-ins, so a plugin can also replace the
+  shipped Hugging Face provider
+
+### Changed
+
+- `ModelManager._resolve_backend_catalog` now resolves through
+  `CatalogProviderRegistry` instead of hardcoding
+  `HuggingFaceCatalogProvider`/a fixed backend allowlist — behavior for LM
+  Studio/llama.cpp is unchanged, but any backend with a registered catalog
+  plugin (built-in or third-party) is now picked up automatically
+
 ## [0.1.3] - 2026-07-19
 
 Dynamic catalog: replaced static `catalog.json` with live scraping of ollama.com.

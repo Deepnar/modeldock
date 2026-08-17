@@ -40,6 +40,22 @@ class RegistryPort(Protocol):
 
 ---
 
+## CatalogProvider
+
+The fetch/parse contract for a single live catalog source — one layer below
+`RegistryPort`. See [Catalog Provider Registry](catalog-provider-registry.md)
+for how backends resolve to one of these, including third-party plugins.
+
+```python
+class CatalogProvider(Protocol):
+    backend: RuntimeBackend
+
+    def fetch(self) -> list[dict] | None: ...
+    def to_spec(self, raw: dict) -> ModelSpec: ...
+```
+
+---
+
 ## DownloaderPort
 
 ```python

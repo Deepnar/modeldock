@@ -89,6 +89,7 @@ nav:
     - Design Overview: architecture/overview.md
     - Clean Architecture: architecture/clean-architecture.md
     - Runtime Adapters: architecture/runtime-adapters.md
+    - Catalog Provider Registry: architecture/catalog-provider-registry.md
     - Port Interfaces: architecture/ports.md
     - Error Handling: architecture/errors.md
   - Contributing:
