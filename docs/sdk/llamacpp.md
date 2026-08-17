@@ -57,6 +57,30 @@ include real `--hf-repo` coordinates rather than only Ollama tags. Set
 `catalog_source="bundled"` or `"ollama"` for a single, explicit source with
 no live Hugging Face lookup.
 
+### GGUF model path resolution
+
+`llama-server` typically reports the *filesystem path* it was launched with
+as the model `id` in `/v1/models` — e.g. `/models/llama-3-8b-instruct.Q4_K_M.gguf`
+or, on Windows, `C:\models\llama-3-8b-instruct.Q4_K_M.gguf` — rather than a
+bare alias. `LlamaCppRuntime` accounts for this in two ways:
+
+- **Parsing**: path-shaped ids are wrapped as a `ModelRef` directly instead of
+  going through the generic `name:tag` parser, so a Windows drive letter's
+  colon is never mistaken for a tag separator.
+- **Matching**: `is_installed()` (and therefore `run()`, `pull()`'s
+  already-installed check, and `get_model_client()`) first tries an exact
+  match, then falls back to comparing the bare filename with its `.gguf`
+  extension stripped. This means you can refer to a loaded model by its
+  filename alone, with or without the extension:
+
+```python
+mgr.run("llama-3-8b-instruct.Q4_K_M", prompt="hi")       # matches
+mgr.run("llama-3-8b-instruct.Q4_K_M.gguf", prompt="hi")  # also matches
+```
+
+even though `llama-server` is actually reporting the full path it was
+started with (`/models/llama-3-8b-instruct.Q4_K_M.gguf`).
+
 ### `install()` fails with an actionable message
 
 Because there is no network API to fetch a model into a running server,

@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+`llama.cpp`: support GGUF model path resolution. `llama-server` reports the
+filesystem path it was launched with as the model id on `/v1/models` (e.g.
+`/models/llama-3-8b.Q4_K_M.gguf`, or a Windows path with a drive letter), not
+a bare alias. `LlamaCppRuntime` now parses these ids without corrupting
+Windows drive-letter colons, and `is_installed()`/`run()`/`pull()` match a
+user-supplied filename (with or without the `.gguf` extension) against the
+full path llama-server reports, instead of requiring an exact string match.
+
+### Fixed
+
+- `LlamaCppRuntime.list_installed()` no longer mis-parses a Windows GGUF path
+  (`C:\models\model.gguf`) by splitting on the drive letter's colon
+- `LlamaCppRuntime.is_installed()` now matches a bare GGUF filename (with or
+  without extension) against the full path llama-server reports, so
+  `run()`/`pull()`/`get_model_client()` no longer falsely report a loaded
+  model as not installed
+
+---
+
 Registry internals refactor — no behavior change. Groundwork for adding new
 live catalog sources (e.g. Hugging Face for LM Studio/llama.cpp) without
 duplicating caching/indexing logic per source.

@@ -10,6 +10,7 @@ catalog. See Architecture.md §4/§14.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, List, Optional
 
@@ -45,6 +46,10 @@ _HOST_CANDIDATES = (
 # /health is llama-server's lightweight liveness endpoint: present as soon as
 # the process is up, even while the model is still loading.
 _PROBE_PATH = "/health"
+
+# Matches a Windows drive-letter prefix (`C:\...` or `C:/...`), so such paths
+# aren't mistaken for the `name:tag` convention used elsewhere in ModelDock.
+_WINDOWS_DRIVE_RE = re.compile(r"^[A-Za-z]:[\\/]")
 
 _SERVER_NOT_RUNNING_HINT = "Start llama.cpp's server: `llama-server -m <model.gguf>`."
 _SINGLE_MODEL_HINT = (
@@ -199,6 +204,50 @@ class LlamaCppRuntime(BaseRuntime):
             return str(entry.get("id", ""))
         return ""
 
+    @staticmethod
+    def _is_gguf_path(model_id: str) -> bool:
+        """True if ``model_id`` looks like a filesystem path rather than a name.
+
+        llama-server commonly reports the id of ``/v1/models`` as the path it
+        was started with (``-m /models/llama-3-8b.Q4_K_M.gguf``), not a bare
+        alias. Detected via a path separator, a Windows drive letter, or a
+        ``.gguf`` extension.
+        """
+        return (
+            "/" in model_id
+            or "\\" in model_id
+            or bool(_WINDOWS_DRIVE_RE.match(model_id))
+            or model_id.lower().endswith(".gguf")
+        )
+
+    def _ref_from_model_id(self, model_id: str) -> ModelRef:
+        """Build a ``ModelRef`` from a ``/v1/models`` id.
+
+        ``ModelRef.parse`` splits on the first ``:`` to find a tag, which
+        corrupts Windows-style paths (``C:\\models\\model.gguf``) and is
+        meaningless for a filesystem path anyway. Path-shaped ids are wrapped
+        directly, preserving the full path as ``name`` with tag ``"latest"``;
+        non-path ids (e.g. an ``--alias``) still go through the generic
+        parser so ``name:tag`` conventions keep working.
+        """
+        if self._is_gguf_path(model_id):
+            return ModelRef(name=model_id, tag="latest", backend=RuntimeBackend.LLAMACPP)
+        return ModelRef.parse(model_id, backend=RuntimeBackend.LLAMACPP)
+
+    @staticmethod
+    def _match_key(name: str) -> str:
+        """Normalize a model name/path for tolerant matching.
+
+        Strips any directory component and a trailing ``.gguf`` extension, and
+        normalizes Windows path separators, so a user can refer to a loaded
+        model by its bare filename (``llama-3-8b.Q4_K_M``/``.gguf``) even
+        though llama-server reports the full path it was launched with.
+        """
+        basename = name.replace("\\", "/").rsplit("/", 1)[-1]
+        if basename.lower().endswith(".gguf"):
+            basename = basename[: -len(".gguf")]
+        return basename
+
     # --- RuntimePort hooks ------------------------------------------------
 
     def list_installed(self) -> List[ModelRef]:
@@ -223,8 +272,22 @@ class LlamaCppRuntime(BaseRuntime):
             model_id = self._parse_model_id(entry)
             if not model_id:
                 continue
-            refs.append(ModelRef.parse(model_id, backend=RuntimeBackend.LLAMACPP))
+            refs.append(self._ref_from_model_id(model_id))
         return refs
+
+    def is_installed(self, ref: ModelRef) -> bool:
+        """Presence check tolerant of llama-server reporting a GGUF filepath.
+
+        Falls back to path-aware matching (bare filename, extension-optional,
+        slash-normalized) when the exact name/tag match fails, since a user
+        naturally refers to a model by filename while llama-server may report
+        the full path it was launched with.
+        """
+        installed = self.list_installed()
+        if any(existing.name == ref.name and existing.tag == ref.tag for existing in installed):
+            return True
+        target = self._match_key(ref.name)
+        return any(self._match_key(existing.name) == target for existing in installed)
 
     def _do_pull(self, ref: ModelRef, progress: Any) -> PullResult:
         """Fail clearly: llama-server has no API to download or swap models.
