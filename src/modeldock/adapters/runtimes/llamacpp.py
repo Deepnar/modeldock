@@ -51,13 +51,12 @@ _PROBE_PATH = "/health"
 # aren't mistaken for the `name:tag` convention used elsewhere in ModelDock.
 _WINDOWS_DRIVE_RE = re.compile(r"^[A-Za-z]:[\\/]")
 
-_SERVER_NOT_RUNNING_HINT = "Start llama.cpp's server: `llama-server -m <model.gguf>`."
-_SINGLE_MODEL_HINT = (
-    "llama-server binds exactly one model per process and exposes no API to "
-    "download or swap models. Stop the server and restart it with "
-    "`llama-server -m <model.gguf>` (or `--hf-repo`/`--hf-file` to fetch from "
-    "Hugging Face) pointing at the model you want."
-)
+# llama-server has no API to report or configure GPU offload on an already
+# running process (it's a launch-time concern), so this only shapes the
+# `-ngl` flag in the launch commands ModelDock suggests. LLAMA_ARG_N_GPU_LAYERS
+# is llama-server's own env-var form of `-ngl` (see its --help / server docs);
+# the namespaced form takes precedence, same as the host env vars above.
+_GPU_LAYERS_ENV_VARS = ("MODELDOCK_LLAMACPP_GPU_LAYERS", "LLAMA_ARG_N_GPU_LAYERS")
 
 
 class LlamaCppRuntime(BaseRuntime):
@@ -70,12 +69,14 @@ class LlamaCppRuntime(BaseRuntime):
         host: Optional[str] = None,
         api_key: Optional[str] = None,
         cache_dir: Optional[Path] = None,
+        gpu_layers: Optional[int] = None,
     ) -> None:
         super().__init__()
         self._host = host
         self._api_key = api_key
         self._client: Any = None
         self._cache_dir = cache_dir
+        self._gpu_layers = gpu_layers
         self._hf_catalog: Optional[HuggingFaceCatalogProvider] = None
 
     # --- internal helpers -------------------------------------------------
@@ -100,6 +101,54 @@ class LlamaCppRuntime(BaseRuntime):
         import os
 
         return self._api_key or os.environ.get("LLAMACPP_API_KEY")
+
+    def _resolve_gpu_layers(self) -> Optional[int]:
+        """Resolve the configured GPU-layer offload count, if any.
+
+        Precedence: explicit arg (config) > MODELDOCK_LLAMACPP_GPU_LAYERS >
+        LLAMA_ARG_N_GPU_LAYERS (llama-server's own `-ngl` env var) > unset.
+        ``None`` means "not configured" -- the suggested launch command omits
+        `-ngl` rather than guessing a value.
+        """
+        if self._gpu_layers is not None:
+            return self._gpu_layers
+        import os
+
+        for name in _GPU_LAYERS_ENV_VARS:
+            value = os.environ.get(name)
+            if not value:
+                continue
+            try:
+                return int(value)
+            except ValueError:
+                continue
+        return None
+
+    def _launch_command(self, model_arg: str = "<model.gguf>") -> str:
+        """Build the `llama-server` invocation to suggest to the user.
+
+        Includes `-ngl <n>` when GPU layers are configured (see
+        ``_resolve_gpu_layers``), since llama-server has no API to report or
+        set this on a running process -- it must be passed at launch.
+        """
+        gpu_layers = self._resolve_gpu_layers()
+        command = f"llama-server -m {model_arg}"
+        if gpu_layers is not None:
+            command += f" -ngl {gpu_layers}"
+        return command
+
+    def _server_not_running_hint(self) -> str:
+        """Actionable hint for a down/unreachable server."""
+        return f"Start llama.cpp's server: `{self._launch_command()}`."
+
+    def _single_model_hint(self) -> str:
+        """Actionable hint explaining llama-server's single-model constraint."""
+        return (
+            "llama-server binds exactly one model per process and exposes no API to "
+            "download or swap models. Stop the server and restart it with "
+            f"`{self._launch_command()}` (or `--hf-repo`/`--hf-file` to fetch from "
+            "Hugging Face) pointing at the model you want."
+        )
 
     def _ensure_client(self) -> Any:
         """Lazily build an OpenAI-compatible client for llama-server."""
@@ -158,7 +207,7 @@ class LlamaCppRuntime(BaseRuntime):
         surfacing a misleading downstream error like "model not installed".
         """
         if not self.is_available():
-            raise RuntimeUnavailableError("llamacpp", hint=_SERVER_NOT_RUNNING_HINT)
+            raise RuntimeUnavailableError("llamacpp", hint=self._server_not_running_hint())
 
     # --- backend-specific model suggestions --------------------------------
 
@@ -304,7 +353,7 @@ class LlamaCppRuntime(BaseRuntime):
         return PullResult(
             ref=ref,
             success=False,
-            error=f"llama.cpp does not support remote pull. {_SINGLE_MODEL_HINT}",
+            error=f"llama.cpp does not support remote pull. {self._single_model_hint()}",
         )
 
     def _get_client(self, ref: ModelRef) -> Any:
@@ -322,7 +371,7 @@ class LlamaCppRuntime(BaseRuntime):
                 ),
             )
         self._require_available()
-        raise DownloadError(ref.name, reason=_SINGLE_MODEL_HINT)
+        raise DownloadError(ref.name, reason=self._single_model_hint())
 
     def run(
         self,

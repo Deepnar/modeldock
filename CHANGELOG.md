@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+`llama.cpp`: GPU layers configuration. `llama-server` has no API to report or
+set how many layers it offloaded to the GPU — it's a launch-time `-ngl` flag,
+not something a running server can be queried or reconfigured for. Added a
+`llamacpp_gpu_layers` setting (`config.toml` / `MODELDOCK_LLAMACPP_GPU_LAYERS`
+/ llama-server's own `LLAMA_ARG_N_GPU_LAYERS` env var) so the launch commands
+ModelDock suggests (e.g. "server not running") include the right `-ngl` value
+instead of a bare `llama-server -m <model.gguf>`.
+
+### Added
+
+- `Settings.llamacpp_gpu_layers` — resolves via `config.toml`, then
+  `MODELDOCK_LLAMACPP_GPU_LAYERS`, then llama-server's own
+  `LLAMA_ARG_N_GPU_LAYERS`; `-1` means "offload all layers"
+- `LlamaCppRuntime(gpu_layers=...)` and the `_resolve_runtime`/`RuntimeRegistry`
+  wiring that forwards the configured value from `ModelManager`
+
+---
+
 `llama.cpp`: support GGUF model path resolution. `llama-server` reports the
 filesystem path it was launched with as the model id on `/v1/models` (e.g.
 `/models/llama-3-8b.Q4_K_M.gguf`, or a Windows path with a drive letter), not

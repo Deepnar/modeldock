@@ -153,6 +153,11 @@ class ModelManager:
         RuntimeBackend.LM_STUDIO: "lmstudio_host",
     }
 
+    #: Config field holding the GPU-layers override for each backend that has one.
+    _GPU_LAYERS_SETTING_FOR = {
+        RuntimeBackend.LLAMACPP: "llamacpp_gpu_layers",
+    }
+
     def _resolve_runtime(self, backend: RuntimeBackend, cfg: Settings) -> RuntimePort:
         # Apply the configured host at construction time so it always takes
         # effect (clients are built lazily and cached per instance). Backends
@@ -160,8 +165,10 @@ class ModelManager:
         # server is not on the conventional address.
         host_field = self._HOST_SETTING_FOR.get(backend)
         host = getattr(cfg, host_field, None) if host_field else None
+        gpu_layers_field = self._GPU_LAYERS_SETTING_FOR.get(backend)
+        gpu_layers = getattr(cfg, gpu_layers_field, None) if gpu_layers_field else None
         try:
-            runtime = self._runtime_registry.get(backend, host=host)
+            runtime = self._runtime_registry.get(backend, host=host, gpu_layers=gpu_layers)
         except KeyError as exc:
             raise RuntimeUnavailableError(backend.value) from exc
         if not runtime.is_available():

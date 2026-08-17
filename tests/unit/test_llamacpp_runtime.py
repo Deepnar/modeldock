@@ -658,3 +658,120 @@ def test_registered_as_builtin_backend() -> None:
     runtime = registry.get(RuntimeBackend.LLAMACPP)
     assert isinstance(runtime, LlamaCppRuntime)
     assert runtime.backend == RuntimeBackend.LLAMACPP
+
+
+def test_registry_forwards_gpu_layers() -> None:
+    from modeldock.adapters.runtimes.registry import RuntimeRegistry
+
+    registry = RuntimeRegistry()
+    runtime = registry.get(RuntimeBackend.LLAMACPP, gpu_layers=20)
+    assert runtime._gpu_layers == 20
+
+
+def test_manager_forwards_configured_gpu_layers_to_llamacpp_runtime() -> None:
+    from modeldock.common.config import Settings
+    from modeldock.core.manager import ModelManager
+
+    mgr = ModelManager(
+        backend=RuntimeBackend.LLAMACPP,
+        settings=Settings(llamacpp_gpu_layers=35, catalog_source="bundled"),
+    )
+    assert mgr._runtime._gpu_layers == 35
+
+
+# --- GPU layers configuration tests -------------------------------------------
+
+
+def test_gpu_layers_unset_by_default() -> None:
+    import os
+
+    os.environ.pop("MODELDOCK_LLAMACPP_GPU_LAYERS", None)
+    os.environ.pop("LLAMA_ARG_N_GPU_LAYERS", None)
+    runtime = LlamaCppRuntime()
+    assert runtime._resolve_gpu_layers() is None
+
+
+def test_gpu_layers_explicit_arg_applied() -> None:
+    runtime = LlamaCppRuntime(gpu_layers=32)
+    assert runtime._resolve_gpu_layers() == 32
+
+
+def test_gpu_layers_vendor_env_used_when_no_explicit_value() -> None:
+    import os
+
+    os.environ["LLAMA_ARG_N_GPU_LAYERS"] = "99"
+    try:
+        runtime = LlamaCppRuntime()
+        assert runtime._resolve_gpu_layers() == 99
+    finally:
+        del os.environ["LLAMA_ARG_N_GPU_LAYERS"]
+
+
+def test_gpu_layers_modeldock_env_wins_over_vendor_env() -> None:
+    import os
+
+    os.environ["MODELDOCK_LLAMACPP_GPU_LAYERS"] = "10"
+    os.environ["LLAMA_ARG_N_GPU_LAYERS"] = "999"
+    try:
+        runtime = LlamaCppRuntime()
+        assert runtime._resolve_gpu_layers() == 10
+    finally:
+        del os.environ["MODELDOCK_LLAMACPP_GPU_LAYERS"]
+        del os.environ["LLAMA_ARG_N_GPU_LAYERS"]
+
+
+def test_gpu_layers_explicit_arg_wins_over_env() -> None:
+    import os
+
+    os.environ["MODELDOCK_LLAMACPP_GPU_LAYERS"] = "10"
+    try:
+        runtime = LlamaCppRuntime(gpu_layers=64)
+        assert runtime._resolve_gpu_layers() == 64
+    finally:
+        del os.environ["MODELDOCK_LLAMACPP_GPU_LAYERS"]
+
+
+def test_gpu_layers_ignores_unparseable_env_value() -> None:
+    import os
+
+    os.environ["LLAMA_ARG_N_GPU_LAYERS"] = "auto"
+    try:
+        runtime = LlamaCppRuntime()
+        assert runtime._resolve_gpu_layers() is None
+    finally:
+        del os.environ["LLAMA_ARG_N_GPU_LAYERS"]
+
+
+def test_launch_command_omits_ngl_when_not_configured() -> None:
+    runtime = LlamaCppRuntime()
+    assert runtime._launch_command() == "llama-server -m <model.gguf>"
+
+
+def test_launch_command_includes_ngl_when_configured() -> None:
+    runtime = LlamaCppRuntime(gpu_layers=35)
+    assert runtime._launch_command() == "llama-server -m <model.gguf> -ngl 35"
+
+
+def test_server_not_running_hint_includes_configured_gpu_layers() -> None:
+    http_client = MagicMock()
+    http_client.get.side_effect = RuntimeError("connection refused")
+    runtime = LlamaCppRuntime(gpu_layers=35)
+    runtime._ensure_http_client = lambda: http_client  # type: ignore[assignment]
+
+    with pytest.raises(RuntimeUnavailableError) as exc_info:
+        runtime.run(
+            ModelRef(name="qwen2.5-7b-instruct", tag="latest", backend=RuntimeBackend.LLAMACPP),
+            prompt="hi",
+        )
+    assert "-ngl 35" in str(exc_info.value)
+
+
+def test_single_model_hint_includes_configured_gpu_layers() -> None:
+    http_client = _MockHTTPClient(models_response={"data": [{"id": "qwen2.5-7b-instruct"}]})
+    runtime = _runtime_with_http_client(http_client)
+    runtime._gpu_layers = 35
+    ref = ModelRef(name="qwen2.5-7b-instruct", tag="latest", backend=RuntimeBackend.LLAMACPP)
+
+    with pytest.raises(DownloadError) as exc_info:
+        runtime.remove(ref)
+    assert "-ngl 35" in str(exc_info.value)
