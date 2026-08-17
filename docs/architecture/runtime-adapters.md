@@ -104,5 +104,6 @@ A `RuntimeRegistry` maps `RuntimeBackend` → factory. Discovered via entry poin
 
 ## Next Steps
 
+- [Catalog Provider Registry](catalog-provider-registry.md) — the parallel mechanism for live model catalogs
 - [Port Interfaces](ports.md) — the full contract
 - [Adding Runtimes](../contributing/new-runtime.md) — contributor guide
