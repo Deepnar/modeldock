@@ -29,6 +29,32 @@ def test_settings_validates_progress_style() -> None:
         Settings(progress_style="rainbow")
 
 
+def test_settings_llamacpp_gpu_layers_defaults_to_none() -> None:
+    assert Settings().llamacpp_gpu_layers is None
+
+
+def test_settings_llamacpp_gpu_layers_accepts_non_negative_int() -> None:
+    assert Settings(llamacpp_gpu_layers=35).llamacpp_gpu_layers == 35
+
+
+def test_settings_llamacpp_gpu_layers_accepts_negative_one() -> None:
+    assert Settings(llamacpp_gpu_layers=-1).llamacpp_gpu_layers == -1
+
+
+def test_settings_llamacpp_gpu_layers_coerces_numeric_string() -> None:
+    assert Settings(llamacpp_gpu_layers="42").llamacpp_gpu_layers == 42
+
+
+def test_settings_llamacpp_gpu_layers_rejects_below_negative_one() -> None:
+    with pytest.raises(ConfigError):
+        Settings(llamacpp_gpu_layers=-2)
+
+
+def test_settings_llamacpp_gpu_layers_rejects_non_integer() -> None:
+    with pytest.raises(ConfigError):
+        Settings(llamacpp_gpu_layers="auto")
+
+
 def test_load_settings_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("MODELDOCK_DEFAULT_BACKEND", "vllm")
     monkeypatch.setenv("MODELDOCK_AUTO_INSTALL", "true")
@@ -47,6 +73,20 @@ def test_load_settings_cache_dir_env(monkeypatch: pytest.MonkeyPatch, tmp_path: 
     monkeypatch.setenv("MODELDOCK_CACHE_DIR", str(tmp_path / "models"))
     s = load_settings()
     assert s.cache_dir == tmp_path / "models"
+
+
+def test_load_settings_llamacpp_gpu_layers_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("MODELDOCK_LLAMACPP_GPU_LAYERS", "28")
+    s = load_settings()
+    assert s.llamacpp_gpu_layers == 28
+
+
+def test_load_settings_llamacpp_gpu_layers_invalid_env_falls_back(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("MODELDOCK_LLAMACPP_GPU_LAYERS", "auto")
+    s = load_settings()
+    assert s.llamacpp_gpu_layers is None
 
 
 def test_default_cache_dir_override(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -123,6 +163,13 @@ def test_sparse_explicit_overrides_preserve_other_settings(
     assert s.log_level == "INFO"
     assert s.auto_install is True
     assert s.ollama_host == "http://user:11434"
+
+
+def test_toml_llamacpp_gpu_layers_applied(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    user_dir = _isolate_config_dirs(monkeypatch, tmp_path)
+    (user_dir / "config.toml").write_text("llamacpp_gpu_layers = 40\n")
+    s = load_settings()
+    assert s.llamacpp_gpu_layers == 40
 
 
 def test_corrupt_config_is_skipped(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

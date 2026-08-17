@@ -45,6 +45,7 @@ class Settings(BaseModel):
     auto_install: bool = False
     ollama_host: Optional[str] = None
     lmstudio_host: Optional[str] = None
+    llamacpp_gpu_layers: Optional[int] = None
     config_path: Optional[Path] = None
 
     @field_validator("log_level")
@@ -75,6 +76,24 @@ class Settings(BaseModel):
                 f"Invalid catalog_source {value!r}; expected one of {sorted(allowed)}"
             )
         return value
+
+    @field_validator("llamacpp_gpu_layers", mode="before")
+    @classmethod
+    def _validate_llamacpp_gpu_layers(cls, value: Any) -> Optional[int]:
+        if value is None:
+            return None
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError) as exc:
+            raise ConfigError(
+                f"Invalid llamacpp_gpu_layers {value!r}; expected an integer"
+            ) from exc
+        if parsed < -1:
+            raise ConfigError(
+                f"Invalid llamacpp_gpu_layers {parsed}; expected -1 (offload all layers) "
+                "or a non-negative number of layers"
+            )
+        return parsed
 
     def to_env_overrides(self) -> Dict[str, str]:
         """Return the env-var form of these settings (for subprocess/debug)."""
@@ -159,6 +178,9 @@ def _apply_mapping(settings: Settings, data: Dict[str, Any], source: str = "conf
         _safe_set(settings, "ollama_host", data["ollama_host"] or None, source)
     if "lmstudio_host" in data:
         _safe_set(settings, "lmstudio_host", data["lmstudio_host"] or None, source)
+    if "llamacpp_gpu_layers" in data:
+        raw = data["llamacpp_gpu_layers"]
+        _safe_set(settings, "llamacpp_gpu_layers", raw if raw not in (None, "") else None, source)
 
 
 def load_settings(
@@ -205,6 +227,7 @@ def load_settings(
         f"{_ENV_PREFIX}PROGRESS_STYLE": "progress_style",
         f"{_ENV_PREFIX}OLLAMA_HOST": "ollama_host",
         f"{_ENV_PREFIX}LMSTUDIO_HOST": "lmstudio_host",
+        f"{_ENV_PREFIX}LLAMACPP_GPU_LAYERS": "llamacpp_gpu_layers",
     }
     env_data = {
         field_name: os.environ[env_key]
