@@ -394,6 +394,33 @@ def test_run_single_prompt_streams_tokens() -> None:
     assert result.completion_tokens == 2
     assert "".join(written) == "Hello world\n"
 
+def test_run_treats_model_name_as_data() -> None:
+    """Shell metacharacters in model names must not become commands."""
+    openai_client = _MockOpenAIClient(installed=True)
+    runtime = _runtime_with_openai_client(openai_client)
+
+    malicious_name = "llama3;echo injected && whoami | cat"
+    qualified_name = f"{malicious_name}:latest"
+
+    http_client = _MockHTTPClient(
+        models_response={
+            "data": [{"id": qualified_name}]
+        }
+    )
+    runtime._ensure_http_client = lambda: http_client  # type: ignore[assignment]
+
+    result = runtime.run(
+        ModelRef(
+            name=malicious_name,
+            tag="latest",
+            backend=RuntimeBackend.LM_STUDIO,
+        ),
+        prompt="hello",
+    )
+
+    assert result.success
+    assert openai_client.created_completions[0]["model"] == qualified_name   
+
 
 def test_run_raises_when_model_not_installed() -> None:
     """Test run raises error when model is not installed."""

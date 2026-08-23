@@ -285,16 +285,23 @@ def test_env_host_used_when_no_explicit_host(monkeypatch: Any) -> None:
 class _GenerateClient:
     """Fake ollama.Client supporting list() + generate() streaming."""
 
-    def __init__(self, installed: bool = True) -> None:
+    def __init__(
+        self,
+        installed: bool = True,
+        model_name: str = "llama3:latest",
+    ) -> None:
         self._installed = installed
+        self._model_name = model_name
         self.generated: List[str] = []
+        self.generated_models: List[str] = []
 
     def list(self) -> dict[str, Any]:
         if self._installed:
-            return {"models": [{"name": "llama3:latest"}]}
+            return {"models": [{"name": self._model_name}]}
         return {"models": []}
 
     def generate(self, model: str, prompt: str = "", stream: bool = False, **opts: Any) -> Any:
+        self.generated_models.append(model)
         self.generated.append(prompt)
         if stream:
 
@@ -306,11 +313,16 @@ class _GenerateClient:
         return {"response": "Hello world"}
 
 
-def _runtime_with_generate(installed: bool = True) -> OllamaRuntime:
+def _runtime_with_generate(
+    installed: bool = True,
+    model_name: str = "llama3:latest",
+) -> OllamaRuntime:
     runtime = OllamaRuntime()
-    runtime._client = _GenerateClient(installed=installed)
+    runtime._client = _GenerateClient(
+        installed=installed,
+        model_name=model_name,
+    )
     return runtime
-
 
 def test_run_single_prompt_streams_tokens(monkeypatch: Any) -> None:
     runtime = _runtime_with_generate()
@@ -429,3 +441,19 @@ def test_status_unavailable_when_daemon_down() -> None:
     status = runtime.status()
     assert status.available is False
     assert status.device is Device.UNKNOWN
+
+
+def test_run_treats_model_name_as_data() -> None:
+    """Shell metacharacters in model names must not become commands."""
+    malicious_name = "llama3;echo injected && whoami | cat"
+    qualified_name = f"{malicious_name}:latest"
+
+    runtime = _runtime_with_generate(model_name=qualified_name)
+
+    result = runtime.run(
+        ModelRef.parse(malicious_name),
+        prompt="hello",
+    )
+
+    assert result.success
+    assert runtime._client.generated_models == [qualified_name]  # type: ignore[attr-defined]
