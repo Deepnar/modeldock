@@ -8,7 +8,8 @@ Architecture.md §4/§14.
 from __future__ import annotations
 
 import time
-from typing import Any, List, Optional
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, List, Optional
 
 from modeldock.adapters.runtimes import lmstudio_catalog
 from modeldock.adapters.runtimes.base import BaseRuntime
@@ -20,6 +21,9 @@ from modeldock.common.errors import (
 )
 from modeldock.domain.model import Capability, Category, Device, ModelRef, RuntimeBackend
 from modeldock.ports.runtime import PullResult, RunResult
+
+if TYPE_CHECKING:
+    from modeldock.adapters.registry.huggingface_catalog import HuggingFaceCatalogProvider
 
 _DEFAULT_HOST = "http://localhost:1234"
 _DEFAULT_TIMEOUT = 30.0
@@ -45,6 +49,10 @@ _HOST_CANDIDATES = (
 # LM Studio server that is actually up.
 _PROBE_PATH = "/v1/models"
 
+# Actionable next step for beginners when the server can't be reached, rather
+# than a raw connection stack trace. See issue #20.
+_SERVER_NOT_RUNNING_HINT = "Start LM Studio and enable the local server."
+
 
 class LMStudioRuntime(BaseRuntime):
     """Runtime adapter for LM Studio."""
@@ -55,11 +63,14 @@ class LMStudioRuntime(BaseRuntime):
         self,
         host: Optional[str] = None,
         api_key: Optional[str] = None,
+        cache_dir: Optional[Path] = None,
     ) -> None:
         super().__init__()
         self._host = host
         self._api_key = api_key
         self._client: Any = None
+        self._cache_dir = cache_dir
+        self._hf_catalog: Optional[HuggingFaceCatalogProvider] = None
 
     # --- internal helpers -------------------------------------------------
 
@@ -133,24 +144,59 @@ class LMStudioRuntime(BaseRuntime):
         except Exception:
             return False
 
+    def _require_available(self) -> None:
+        """Raise a clear, typed error if the LM Studio server isn't reachable.
+
+        ``list_installed``/``_check_available`` degrade to False/[] on a down
+        server so read-only status checks stay quiet, but operations that
+        actually need the server (run, remove) must fail loudly instead of
+        surfacing a misleading downstream error like "model not installed".
+        """
+        if not self.is_available():
+            raise RuntimeUnavailableError("lmstudio", hint=_SERVER_NOT_RUNNING_HINT)
+
     # --- backend-specific model suggestions --------------------------------
 
+    def _live_catalog(self) -> HuggingFaceCatalogProvider:
+        """Return the lazily-built, memoized live Hugging Face catalog.
+
+        Constructed once per runtime instance since it fetches over the
+        network on first use (like ``OllamaLibraryRegistry``).
+        """
+        if self._hf_catalog is None:
+            from modeldock.adapters.registry.huggingface_catalog import (
+                HuggingFaceCatalogProvider,
+            )
+            from modeldock.common.platform import default_cache_dir
+
+            self._hf_catalog = HuggingFaceCatalogProvider(
+                self._cache_dir or default_cache_dir(), RuntimeBackend.LM_STUDIO
+            )
+        return self._hf_catalog
+
     def models_for_category(self, category: Category) -> List[ModelRef]:
-        """Return curated LM Studio models for ``category``.
+        """Return LM Studio models for ``category``.
 
         LM Studio addresses models by Hugging Face coordinates
         (``publisher/repo``), not by the Ollama tags the shared catalog is built
-        from, so category installs resolve through this mapping instead. Returns
-        an empty list for a category with no curated entries, which callers
-        treat as "nothing to suggest" rather than an error. See issue #19.
+        from, so category installs resolve through the Hugging Face Hub's live
+        GGUF listing (see issue #19). Falls back to a small curated table when
+        the Hub is unreachable and no cache exists yet, so suggestions never
+        require a network round trip to work at all — only to be fresh.
         """
+        live = self._live_catalog().models_for_category(category)
+        if live:
+            return live
         return [
             ModelRef.parse(entry.model_id, backend=RuntimeBackend.LM_STUDIO)
             for entry in lmstudio_catalog.models_for_category(category)
         ]
 
     def models_for_capability(self, capability: Capability) -> List[ModelRef]:
-        """Return curated LM Studio models exposing ``capability``."""
+        """Return LM Studio models exposing ``capability`` (live, with static fallback)."""
+        live = self._live_catalog().models_for_capability(capability)
+        if live:
+            return live
         return [
             ModelRef.parse(entry.model_id, backend=RuntimeBackend.LM_STUDIO)
             for entry in lmstudio_catalog.models_for_capability(capability)
@@ -297,6 +343,7 @@ class LMStudioRuntime(BaseRuntime):
                     "cannot be removed locally."
                 ),
             )
+        self._require_available()
 
         model_id = ref.qualified_name()
         try:
@@ -334,6 +381,7 @@ class LMStudioRuntime(BaseRuntime):
         from stdin until EOF or a quit command. Requires the model to be
         installed locally.
         """
+        self._require_available()
         if not self.is_installed(ref):
             raise ModelNotInstalledError(ref.qualified_name())
         client = self._ensure_client()

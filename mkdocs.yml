@@ -21,21 +21,27 @@ copyright: >-
 theme:
   name: material
   language: en
+  logo: images/logo-header.png
+  favicon: images/modeldock.png
   palette:
-    # Dark mode (default — industrial, focused)
-    - scheme: default
-      primary: blue grey
+    # Light mode — respects the OS preference on first visit. Flat white
+    # header/nav (no colored bar) in the style of modern docs platforms
+    # like Mintlify.
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: white
       accent: teal
       toggle:
         icon: material/brightness-7
-        name: Switch to light mode
-    # Light mode
-    - scheme: slate
-      primary: blue grey
+        name: Switch to dark mode
+    # Dark mode — flat near-black header to match.
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: black
       accent: teal
       toggle:
         icon: material/brightness-4
-        name: Switch to dark mode
+        name: Switch to light mode
 
   font:
     text: Inter
@@ -43,16 +49,18 @@ theme:
 
   icon:
     repo: fontawesome/brands/github
-    logo: material/package-variant-closed
 
   features:
     - navigation.instant
+    - navigation.instant.progress
     - navigation.tracking
     - navigation.tabs
+    - navigation.tabs.sticky
     - navigation.sections
     - navigation.expand
     - navigation.path
     - navigation.top
+    - navigation.footer
     - navigation.indexes
     - search.suggest
     - search.highlight
@@ -61,6 +69,9 @@ theme:
     - content.code.annotate
     - content.code.select
     - content.tabs.link
+    - content.action.edit
+    - content.action.view
+    - content.tooltips
     - toc.follow
     - toc.integrate
 
@@ -84,10 +95,12 @@ nav:
     - CLI Reference: sdk/cli.md
     - Ollama Integration: sdk/ollama.md
     - LM Studio Integration: sdk/lmstudio.md
+    - llama.cpp Integration: sdk/llamacpp.md
   - Architecture:
     - Design Overview: architecture/overview.md
     - Clean Architecture: architecture/clean-architecture.md
     - Runtime Adapters: architecture/runtime-adapters.md
+    - Catalog Provider Registry: architecture/catalog-provider-registry.md
     - Port Interfaces: architecture/ports.md
     - Error Handling: architecture/errors.md
   - Contributing:
@@ -126,6 +139,9 @@ markdown_extensions:
   - pymdownx.keys
   - pymdownx.tasklist:
       custom_checkbox: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - attr_list
   - md_in_html
   - def_list

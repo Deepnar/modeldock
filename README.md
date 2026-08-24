@@ -32,6 +32,10 @@ pluggable runtime adapters. It does **not** run inference itself; it orchestrate
 runtimes (starting with Ollama). No more manual `ollama pull` commands — just
 write `md.load("llama3")` and ModelDock handles the rest.
 
+<p align="center">
+  <img src="docs/images/demo.gif" alt="ModelDock demo: installing modeldock, loading a model with the Python SDK, and browsing models with the CLI" width="720">
+</p>
+
 ## Features
 
 - **Python-first API** — `md.load("llama3")` auto-installs if missing and returns a ready client.
@@ -165,6 +169,7 @@ progress_style  = "rich"
 | `MODELDOCK_CACHE_DIR` | Override cache location | platform default |
 | `MODELDOCK_OLLAMA_HOST` | Ollama server base URL | auto-discovered |
 | `MODELDOCK_LMSTUDIO_HOST` | LM Studio server base URL | auto-discovered |
+| `MODELDOCK_LLAMACPP_GPU_LAYERS` | GPU layers to offload for llama.cpp | unset |
 
 ### Runtime server URLs
 
@@ -180,6 +185,23 @@ Runtimes that talk to a local server resolve their base URL in this order:
 Discovery only runs when nothing is configured, so naming a host costs no
 probing. URLs are normalized: `localhost:1234`, a trailing slash, and the
 `/v1`-suffixed URL LM Studio's UI displays are all accepted.
+
+### llama.cpp GPU layers
+
+`llama-server` binds one already-running process and has no API to report or
+change how many layers it offloaded to the GPU — that's a launch-time `-ngl`
+flag, not something a client can query or set afterwards. ModelDock lets you
+configure the value you use so every launch command it suggests (e.g. when
+the server isn't running yet) includes it:
+
+1. `llamacpp_gpu_layers` in `config.toml`
+2. `MODELDOCK_LLAMACPP_GPU_LAYERS`
+3. `LLAMA_ARG_N_GPU_LAYERS` — llama-server's own env var for `-ngl`
+4. Unset — suggested commands omit `-ngl` entirely
+
+```toml
+llamacpp_gpu_layers = 35  # or -1 to offload all layers
+```
 
 ## Supported Runtimes
 

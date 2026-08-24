@@ -74,10 +74,19 @@ class HttpDownloader:
 
     @staticmethod
     def _url_for(spec: ModelSpec) -> str:
-        url = getattr(spec, "download_url", None)
-        if not url:
-            raise DownloadError(spec.name, reason="No download_url in spec.")
-        return str(url)
+        """Resolve the download URL from the default model variant."""
+        variant = next(
+            (variant for variant in spec.variants if variant.tag == spec.default_tag),
+            None,
+        )
+
+        if variant is None or not variant.download_url:
+            raise DownloadError(
+                spec.name,
+                reason=f"No download_url for variant '{spec.default_tag}'.",
+            )
+
+        return variant.download_url
 
 
 __all__ = ["HttpDownloader"]

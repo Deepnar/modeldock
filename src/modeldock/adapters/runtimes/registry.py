@@ -61,12 +61,19 @@ class RuntimeRegistry:
         except Exception as exc:
             self._logger.debug("Entry-point discovery unavailable: %s", exc)
 
-    def get(self, backend: RuntimeBackend, host: str | None = None) -> RuntimePort:
+    def get(
+        self,
+        backend: RuntimeBackend,
+        host: str | None = None,
+        gpu_layers: int | None = None,
+    ) -> RuntimePort:
         """Return a runtime instance for backend (entry points win).
 
         ``host`` is forwarded to any adapter that supports a host override, so
         a configured host always applies (clients are built lazily per
-        instance). Adapters that do not take one are left untouched.
+        instance). ``gpu_layers`` is forwarded the same way to adapters that
+        support it (currently llama.cpp). Adapters that do not take one are
+        left untouched.
         """
         factory = self._entry_points.get(backend) or _BUILTIN.get(backend)
         if factory is None:
@@ -79,6 +86,8 @@ class RuntimeRegistry:
             clear = getattr(runtime, "clear_host_cache", None)
             if callable(clear):
                 clear()
+        if gpu_layers is not None and hasattr(runtime, "_gpu_layers"):
+            runtime._gpu_layers = gpu_layers
         return runtime
 
     @staticmethod
