@@ -41,8 +41,7 @@ def test_no_shell_execution_in_model_runtime_paths() -> None:
             if isinstance(func, ast.Attribute):
                 if func.attr in forbidden_calls:
                     raise AssertionError(
-                        f"Forbidden shell execution API {func.attr!r} "
-                        f"found in {path}:{node.lineno}"
+                        f"Forbidden shell execution API {func.attr!r} found in {path}:{node.lineno}"
                     )
 
                 if func.attr in {"run", "Popen", "call", "check_call", "check_output"}:
@@ -53,8 +52,7 @@ def test_no_shell_execution_in_model_runtime_paths() -> None:
                             and keyword.value.value is True
                         ):
                             raise AssertionError(
-                                f"subprocess call uses shell=True "
-                                f"in {path}:{node.lineno}"
+                                f"subprocess call uses shell=True in {path}:{node.lineno}"
                             )
 
 
