@@ -324,6 +324,7 @@ def _runtime_with_generate(
     )
     return runtime
 
+
 def test_run_single_prompt_streams_tokens(monkeypatch: Any) -> None:
     runtime = _runtime_with_generate()
     written: List[str] = []
