@@ -95,6 +95,13 @@ class FakeCache(CachePort):
     def status(self) -> List[dict]:
         return list(self.entries.values())
 
+    def get_model_config(self, ref: ModelRef) -> Optional[dict]:
+        entry = self.entries.get(self._key(ref))
+        return entry.get("user_config") if entry else None
+
+    def set_model_config(self, ref: ModelRef, config: dict) -> None:
+        self.entries.setdefault(self._key(ref), {})["user_config"] = config
+
     @staticmethod
     def _key(ref: ModelRef) -> str:
         return f"{ref.name}:{ref.tag}"

@@ -46,3 +46,11 @@ class CachePort(Protocol):
     def path(self) -> str:
         """Return the cache directory path."""
         ...
+
+    def get_model_config(self, ref: ModelRef) -> Optional[Dict[str, Any]]:
+        """Return the user config stored for ``ref``, or None if not set."""
+        ...
+
+    def set_model_config(self, ref: ModelRef, config: Dict[str, Any]) -> None:
+        """Store ``config`` as the user config for ``ref``."""
+        ...
