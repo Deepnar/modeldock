@@ -38,7 +38,10 @@ Send an email to **opensource@openagenthq.com** with:
 - Keep ModelDock up to date (`pip install -U modeldock`)
 - Use environment variables for secrets; never hardcode
 - Download models only from trusted runtimes/registries
-- Review the dynamic catalog source (`ollama.com`)
+- Check a model's provenance before installing — `search`/`info` show the
+  `Source` it came from, and `modeldock sources` lists every active source with
+  its trust level (`official` / `verified` / `community` / `bundled` /
+  `custom`). ModelDock never hides where an artifact originates.
 
 ### For Contributors
 

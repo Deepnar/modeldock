@@ -23,6 +23,19 @@ class RegistryPort(Protocol):
         """Return the canonical spec for ``ref`` (raises if unknown)."""
         ...
 
+    def resolve(self, ref: ModelRef) -> ModelSpec:
+        """Resolve a friendly/alias ``ref`` to its canonical spec (raises if unknown).
+
+        Semantically an alias of :meth:`get`; named separately to make the
+        "friendly name → canonical identity" step of the discovery flow
+        explicit. Implementations may simply delegate to ``get``.
+        """
+        ...
+
+    def versions(self, ref: ModelRef) -> List[str]:
+        """Return the known version tags for ``ref`` (empty when unknown)."""
+        ...
+
     def by_category(self, category: Category) -> List[ModelSpec]:
         """Return all specs in a category."""
         ...

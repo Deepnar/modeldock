@@ -19,6 +19,7 @@ from modeldock.cli.commands.load import load_app
 from modeldock.cli.commands.remove import remove_cmd
 from modeldock.cli.commands.run import run_cmd
 from modeldock.cli.commands.search import search_cmd
+from modeldock.cli.commands.sources import sources_app
 from modeldock.cli.commands.update import update_cmd
 from modeldock.common.logging import configure_logging
 
@@ -36,6 +37,7 @@ app = typer.Typer(
 app.add_typer(load_app, name="load")
 app.add_typer(cache_app, name="cache")
 app.add_typer(config_app, name="config")
+app.add_typer(sources_app, name="sources")
 app.command("install")(install_cmd)
 app.command("install-category")(install_category_cmd)
 app.command("list")(list_cmd)

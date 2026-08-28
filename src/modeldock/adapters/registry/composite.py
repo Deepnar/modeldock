@@ -16,6 +16,7 @@ from typing import Dict, List, Optional, Sequence
 
 from modeldock.common.errors import ModelNotFoundError
 from modeldock.domain.model import Category, ModelRef, ModelSpec
+from modeldock.domain.source import SourceInfo, SourceTrust
 from modeldock.ports.registry import RegistryPort
 
 
@@ -59,6 +60,50 @@ class CompositeRegistry:
             except ModelNotFoundError as exc:
                 last_error = exc
         raise last_error or ModelNotFoundError(ref.name)
+
+    def resolve(self, ref: ModelRef) -> ModelSpec:
+        """Resolve ``ref`` to its canonical spec via the first source that has it."""
+        return self.get(ref)
+
+    def versions(self, ref: ModelRef) -> List[str]:
+        """Return version tags from the first source that knows ``ref``."""
+        try:
+            return self.get(ref).version_tags()
+        except ModelNotFoundError:
+            return []
+
+    def describe(self) -> List[SourceInfo]:
+        """Describe every underlying source, in priority order.
+
+        Each source that can describe itself contributes its own
+        ``SourceInfo``; a source that predates the ``describe`` contract still
+        appears, as a minimal custom entry, so the enumeration is complete.
+        """
+        infos: List[SourceInfo] = []
+        for source in self._sources:
+            describe = getattr(source, "describe", None)
+            if callable(describe):
+                infos.extend(describe())
+            else:
+                infos.append(
+                    SourceInfo(
+                        name=type(source).__name__,
+                        trust=SourceTrust.CUSTOM,
+                        live=True,
+                        model_count=len(source.list_all()),
+                    )
+                )
+        return infos
+
+    def refresh(self) -> int:
+        """Refresh every source that supports it; return total model count."""
+        total = 0
+        for source in self._sources:
+            refresh = getattr(source, "refresh", None)
+            if callable(refresh):
+                refresh()
+            total += len(source.list_all())
+        return total
 
     def by_category(self, category: Category) -> List[ModelSpec]:
         """Return all specs in a category, merged across sources."""

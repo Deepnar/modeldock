@@ -71,7 +71,10 @@ Models present locally.
 modeldock search <query>
 ```
 
-Search by name, capability, or category.
+Search by name, capability, or category across the live sources for the active
+backend. Each result shows a **Source** column (e.g. `Ollama Official`,
+`Hugging Face`) so you can see where a model comes from — you never need to
+know which source holds it.
 
 ---
 
@@ -81,7 +84,33 @@ Search by name, capability, or category.
 modeldock info <model>
 ```
 
-Sizes, capabilities, variants.
+Sizes, capabilities, variants, and the **Source** the metadata came from.
+
+---
+
+### Sources
+
+```bash
+modeldock sources           # list active model sources + status
+modeldock sources refresh   # force live sources to re-fetch (bypass cache TTL)
+```
+
+`sources` reports every model source feeding discovery — its trust level
+(`official` / `verified` / `community` / `bundled` / `custom`), whether it is
+`live` or `static`, the backend it serves, and its current model count.
+`sources refresh` forces each live source to re-fetch immediately instead of
+waiting for its 24-hour discovery-cache TTL.
+
+Example:
+
+```text
+                          Model Sources
++---------------------------------------------------------------+
+| Source          | Trust    | Kind | Backend | Models | Status |
+|-----------------+----------+------+---------+--------+--------|
+| Ollama Official | official | live | ollama  |    238 | ready  |
++---------------------------------------------------------------+
+```
 
 ---
 
@@ -123,7 +152,9 @@ modeldock cache clean
 modeldock cache path
 ```
 
-Manage the cache.
+Manage the **artifact** cache (downloaded files). This is distinct from the
+**discovery** cache that `sources refresh` reloads — see
+[Discover Models](../user-guide/discover.md).
 
 ---
 

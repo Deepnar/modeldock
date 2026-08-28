@@ -77,7 +77,7 @@ This is what makes adding LM Studio, vLLM, etc. a matter of writing one new adap
 | `ports/` | `typing.Protocol` interfaces defining what the system needs from the outside world. |
 | `core/` | Application services implementing use cases by composing ports. |
 | `adapters/runtimes/` | Concrete runtime integrations implementing `RuntimePort`. |
-| `adapters/registry/` | Searchable model catalog. Dynamic from ollama.com with bundled fallback. |
+| `adapters/registry/` | Model **sources** (`RegistryPort`). Live discovery from ollama.com (Ollama) and the Hugging Face Hub (GGUF runtimes) is the source of truth; `catalog.json` is an offline fallback only. Each source stamps provenance onto its results. |
 | `adapters/downloaders/` | Moves bytes. Ollama native pull or generic HTTP. |
 | `adapters/cache/` | Tracks installed/downloaded artifacts. Filesystem manifest + content hashing. |
 | `adapters/progress/` | Pluggable progress reporters (rich, tqdm, silent). |

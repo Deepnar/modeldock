@@ -31,11 +31,13 @@ Callable[[Path], RegistryPort]
 ```
 
 Give it a cache directory, get back a `RegistryPort` — something with
-`search`, `get`, `by_category`, `recommend`, and `list_all`. That's the same
-interface every other registry in ModelDock already implements (see
-[Port Interfaces](ports.md)), so nothing downstream needs to know or care
-whether a given catalog is Ollama's scraper, the bundled JSON, or a
-third-party plugin.
+`search`, `get`, `resolve`, `versions`, `by_category`, `recommend`, and
+`list_all` (live sources also add `describe` and `refresh`). That's the same
+model-source interface every other registry in ModelDock already implements
+(see [Port Interfaces](ports.md)), so nothing downstream needs to know or care
+whether a given source is Ollama's scraper, the bundled JSON, or a
+third-party plugin. Each source stamps provenance (`ModelSpec.source`) onto
+the specs it emits, so discovery results always carry their origin.
 
 In practice this callable is usually one of two things:
 
@@ -79,10 +81,14 @@ the shared catalog understands — simply have no entry here.
 
 This mirrors `RuntimeRegistry`'s existing `modeldock.runtimes` mechanism
 exactly (see [Runtime Adapters](runtime-adapters.md)) — same shape, same
-group-naming convention, different group name:
+group-naming convention, different group name. The **preferred** group is
+`modeldock.model_sources` (a source *is* a model source); the original
+`modeldock.catalog_providers` name is still scanned for backward
+compatibility, so existing plugins keep working. A backend registered under
+either group is discovered (the preferred name wins on a duplicate):
 
 ```toml
-[project.entry-points."modeldock.catalog_providers"]
+[project.entry-points."modeldock.model_sources"]
 vllm = "modeldock_vllm.catalog:build_catalog"
 ```
 
@@ -100,7 +106,9 @@ def build_catalog(cache_dir: Path) -> RegistryPort:
 ```
 
 At construction, `CatalogProviderRegistry` scans
-`importlib.metadata.entry_points(group="modeldock.catalog_providers")`:
+`importlib.metadata.entry_points` for both the preferred
+`modeldock.model_sources` group and the legacy `modeldock.catalog_providers`
+group:
 
 ```python
 class CatalogProviderRegistry:
@@ -171,7 +179,7 @@ unchanged regardless of which plugins are installed.
    just the class itself if its constructor takes only `cache_dir`.
 3. Register it:
    ```toml
-   [project.entry-points."modeldock.catalog_providers"]
+   [project.entry-points."modeldock.model_sources"]
    <backend-name> = "your_package.catalog:build_catalog"
    ```
 4. Nothing else. No core edits — `ModelManager` picks it up automatically

@@ -13,6 +13,7 @@ from modeldock.common.errors import ModelNotFoundError
 from modeldock.common.http import create_client
 from modeldock.common.logging import get_logger
 from modeldock.domain.model import Category, ModelRef, ModelSpec
+from modeldock.domain.source import REMOTE, SourceInfo, SourceTrust
 
 
 class RemoteRegistry:
@@ -31,7 +32,12 @@ class RemoteRegistry:
                 resp = client.get(self._url, timeout=10.0)
                 resp.raise_for_status()
                 data = resp.json()
-            self._specs = [BundledRegistry._to_spec(raw) for raw in data.get("models", [])]
+            self._specs = []
+            for raw in data.get("models", []):
+                spec = BundledRegistry._to_spec(raw)
+                if spec.source is None:
+                    spec.source = REMOTE
+                self._specs.append(spec)
         except Exception as exc:
             self._logger.warning("Remote registry unavailable (%s); using bundled", exc)
             self._specs = self._fallback.list_all()
@@ -47,6 +53,31 @@ class RemoteRegistry:
             return self._fallback.get(ref)
         except ModelNotFoundError:
             raise ModelNotFoundError(ref.name) from None
+
+    def resolve(self, ref: ModelRef) -> ModelSpec:
+        """Resolve a friendly/alias ``ref`` to its canonical spec."""
+        return self.get(ref)
+
+    def versions(self, ref: ModelRef) -> List[str]:
+        """Return known version tags for ``ref`` (empty when unknown)."""
+        try:
+            return self.get(ref).version_tags()
+        except ModelNotFoundError:
+            return []
+
+    def describe(self) -> List[SourceInfo]:
+        """Describe the remote source (user-supplied; treated as custom trust)."""
+        return [
+            SourceInfo(
+                name=REMOTE,
+                trust=SourceTrust.CUSTOM,
+                live=True,
+                backend=None,
+                model_count=len(self._specs),
+                cache_path=self._url,
+                available=bool(self._specs),
+            )
+        ]
 
     def by_category(self, category: Category) -> List[ModelSpec]:
         return [s for s in self._specs if s.category == category] or self._fallback.by_category(

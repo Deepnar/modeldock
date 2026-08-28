@@ -24,6 +24,7 @@ from modeldock.adapters.registry.base import CachedCatalogRegistry
 from modeldock.common.catalog_cache import load_catalog_cache, save_catalog_cache
 from modeldock.common.http import create_client
 from modeldock.domain.model import Capability, Category, ModelRef, ModelSpec, RuntimeBackend
+from modeldock.domain.source import HUGGING_FACE, SourceTrust
 
 _API_URL = "https://huggingface.co/api/models"
 _CACHE_FILENAME = "huggingface_gguf_catalog.json"
@@ -116,7 +117,14 @@ class HuggingFaceCatalogProvider(CachedCatalogRegistry):
             )
         self._backend = backend
         self._limit = limit
-        super().__init__(cache_dir, _CACHE_FILENAME, f"registry.huggingface.{backend.value}")
+        super().__init__(
+            cache_dir,
+            _CACHE_FILENAME,
+            f"registry.huggingface.{backend.value}",
+            source_name=HUGGING_FACE,
+            source_trust=SourceTrust.VERIFIED,
+            source_backend=backend,
+        )
 
     def _load_cache(self) -> Optional[List[Dict[str, Any]]]:
         return load_catalog_cache(self._cache_path, _CACHE_TTL_SECONDS)

@@ -94,6 +94,26 @@ def test_cli_info_renders_installed_section() -> None:
     # Both are valid — just ensure the command doesn't crash.
 
 
+def test_cli_sources_offline() -> None:
+    # `sources` lists active model sources without a runtime and must not crash.
+    result = runner.invoke(app, ["sources"])
+    assert result.exit_code == 0
+    assert "Source" in result.output
+
+
+def test_cli_sources_refresh_offline() -> None:
+    # `sources refresh` forces a re-fetch; offline it degrades gracefully to
+    # whatever is cached/bundled and still exits 0.
+    result = runner.invoke(app, ["sources", "refresh"])
+    assert result.exit_code == 0
+
+
+def test_cli_info_shows_source() -> None:
+    result = runner.invoke(app, ["info", "llama3"])
+    assert result.exit_code == 0
+    assert "Source:" in result.output
+
+
 def test_cli_cache_status_offline() -> None:
     result = runner.invoke(app, ["cache", "status"])
     assert result.exit_code == 0
