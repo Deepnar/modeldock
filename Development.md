@@ -29,6 +29,7 @@ source .venv/bin/activate        # Windows: .venv\Scripts\activate
 
 # Install in editable mode with dev + ollama extras
 pip install -e ".[dev,ollama]"
+pre-commit install
 ```
 
 `pyproject.toml` declares these extras:
@@ -44,6 +45,7 @@ pip install -e ".[dev,ollama]"
 ```
 src/modeldock/        # package source (src/ layout)
 tests/                # unit / integration / e2e
+.pre-commit-config.yaml  # pre-commit hooks (ruff, mypy, bandit)
 .opencode/            # agent + tooling config (not shipped)
 PROJECT.MD            # product intent
 Architecture.md       # design contract
