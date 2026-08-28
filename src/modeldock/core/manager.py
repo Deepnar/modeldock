@@ -8,6 +8,7 @@ Architecture.md §5.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, List, Optional
 
 from modeldock.adapters.downloaders.factory import needs_http_download
@@ -264,10 +265,8 @@ class ModelManager:
             self._download.pull(ref)
         return ref
 
-    def _model_dest(self, spec: ModelSpec, ref: ModelRef) -> "Path":
+    def _model_dest(self, spec: ModelSpec, ref: ModelRef) -> Path:
         """Filesystem path for an HTTP-downloaded GGUF artifact."""
-        from pathlib import Path
-
         cache_dir: Path = self._config.settings.cache_dir
         return cache_dir / "models" / spec.name / f"{ref.tag}.gguf"
 

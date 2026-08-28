@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from modeldock.adapters.downloaders.factory import needs_http_download
 from modeldock.domain.model import Category, ModelSpec, ModelVariant, RuntimeBackend
 
