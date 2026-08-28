@@ -39,6 +39,10 @@ class CachePort(Protocol):
         """Return a snapshot of all cached entries."""
         ...
 
+    def evict(self, ref: ModelRef) -> None:
+        """Remove the manifest entry for ``ref`` if present (no-op otherwise)."""
+        ...
+
     def path(self) -> str:
         """Return the cache directory path."""
         ...

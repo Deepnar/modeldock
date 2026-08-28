@@ -88,6 +88,11 @@ class FilesystemCache:
             self._write_manifest(data)
         return removed
 
+    def evict(self, ref: ModelRef) -> None:
+        data = self._read_manifest()
+        data.get("entries", {}).pop(self._key(ref), None)
+        self._write_manifest(data)
+
     def status(self) -> List[Dict[str, Any]]:
         data = self._read_manifest()
         return list(data.get("entries", {}).values())

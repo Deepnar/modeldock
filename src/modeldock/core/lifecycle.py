@@ -49,12 +49,12 @@ class LifecycleOrchestrator:
             result = self._runtime.pull(ref, self._progress)
             if not result.success:
                 raise ModelNotInstalledError(ref.qualified_name(), auto_install=do_install)
+            if not self._runtime.is_installed(ref):
+                self._cache.evict(ref)
+                raise ModelNotInstalledError(ref.qualified_name(), auto_install=do_install)
             self._cache.record(ref, ref.tag, result.sha256 or "", result.bytes_downloaded)
             if ev is not None:
                 ev.after_install(ref, None)
-
-        if not self._runtime.is_installed(ref):
-            raise ModelNotInstalledError(ref.qualified_name(), auto_install=do_install)
 
         return self._runtime.get_model_client(ref)
 
