@@ -226,7 +226,7 @@ def test_run_model_not_found_exits_1(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_run_result_success_false_exits_1(monkeypatch: pytest.MonkeyPatch) -> None:
     """run() returning a result with success=False must exit 1 (non-exception path)."""
-    monkeypatch.setattr(factory, "ModelManager", lambda **kw: _FailedRunManager(**kw))
+    monkeypatch.setattr(factory, "ModelManager", _FailedRunManager)
     result = runner.invoke(app, ["run", "llama3"])
     assert result.exit_code == 1
 
