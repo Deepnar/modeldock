@@ -8,8 +8,11 @@ Architecture.md §5.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, List, Optional
 
+from modeldock.adapters.downloaders.factory import needs_http_download
+from modeldock.adapters.downloaders.http import HttpDownloader
 from modeldock.adapters.progress import make_progress
 from modeldock.adapters.runtimes.registry import RuntimeRegistry
 from modeldock.common.config import Settings
@@ -29,6 +32,7 @@ from modeldock.domain.model import (
     Category,
     ModelInfo,
     ModelRef,
+    ModelSpec,
     RuntimeBackend,
 )
 from modeldock.ports.cache import CachePort
@@ -72,6 +76,7 @@ class ModelManager:
         self._registry = RegistryService(self._registry_port)
         self._cache = CacheService(self._cache_port)
         self._download = DownloadService(self._runtime, self._cache_port, self._progress)
+        self._http_downloader = HttpDownloader()
         self._lifecycle = LifecycleOrchestrator(
             self._runtime,
             self._registry_port,
@@ -236,15 +241,34 @@ class ModelManager:
     def install(self, name: str, auto_install: bool = True) -> ModelRef:
         """Explicitly download/install a model."""
         ref = ModelRef.parse(name, backend=self._backend)
-        # Validate against the catalog, but allow locally-known models that are
-        # absent from the bundled catalog (e.g. pulled outside ModelDock).
+        # Resolve the spec to decide which download path to use.
+        # Allow locally-known models absent from the catalog (pulled outside
+        # ModelDock) by catching ModelNotFoundError instead of raising.
+        spec: Optional[ModelSpec] = None
         try:
-            self._registry.info(name)
+            spec = self._registry_port.get(ref)
         except ModelNotFoundError:
             if not self._runtime.is_installed(ref):
                 raise
-        self._download.pull(ref)
+
+        if spec is not None and needs_http_download(spec):
+            dest = self._model_dest(spec, ref)
+            self._http_downloader.download(spec, dest, self._progress)
+            variant = spec.default_variant()
+            self._cache_port.record(
+                ref=ref,
+                tag=ref.tag,
+                sha256=variant.sha256 or "" if variant else "",
+                size_bytes=dest.stat().st_size,
+            )
+        else:
+            self._download.pull(ref)
         return ref
+
+    def _model_dest(self, spec: ModelSpec, ref: ModelRef) -> Path:
+        """Filesystem path for an HTTP-downloaded GGUF artifact."""
+        cache_dir: Path = self._config.settings.cache_dir
+        return cache_dir / "models" / spec.name / f"{ref.tag}.gguf"
 
     def suggest_category(self, category: str) -> List[ModelRef]:
         """Return the models ``install_category`` would install, without installing.

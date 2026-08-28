@@ -37,11 +37,18 @@
       "capabilities": ["chat", "completion", "tool_use"],
       "default_tag": "latest",
       "description": "Meta Llama 3.2 — small, efficient chat models for edge and laptop use.",
-      "backend_hints": ["ollama"],
+      "backend_hints": ["ollama", "llamacpp"],
       "variants": [
         { "tag": "latest", "params": "3B", "size_bytes": 2000000000, "min_ram": "4GB" },
         { "tag": "1b", "params": "1B", "size_bytes": 1300000000, "min_ram": "3GB" },
-        { "tag": "3b", "params": "3B", "size_bytes": 2000000000, "min_ram": "4GB" }
+        { "tag": "3b", "params": "3B", "size_bytes": 2000000000, "min_ram": "4GB" },
+        {
+          "tag": "3b-gguf",
+          "params": "3B",
+          "size_bytes": 1930000000,
+          "min_ram": "4GB",
+          "download_url": "https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf"
+        }
       ]
     },
     {
