@@ -60,6 +60,86 @@ installation verification, and loading through pluggable runtime adapters.
 └─────────────────────────────────────────────────────────────┘
 ```
 
+*The diagram below visualizes ModelDock's hexagonal architecture with clear dependency flow from outer layers toward the core domain.*
+
+```mermaid
+flowchart TD
+    subgraph Interface["Interface / Delivery Layer"]
+        SDK["Python SDK<br/>(modeldock/__init__.py)"]
+        CLI["CLI<br/>(modeldock/cli, Typer)"]
+    end
+
+    subgraph Application["Application / Use-Case Layer (core)"]
+        ModelService["ModelManager"]
+        RegistryService["RegistryService"]
+        DownloadService["DownloadService"]
+        CacheService["CacheService"]
+        ConfigService["ConfigService"]
+        Lifecycle["LifecycleOrchestrator"]
+    end
+
+    subgraph Domain["Domain Layer (pure, no I/O)"]
+        Model["Model / ModelSpec / ModelAlias"]
+        CapCat["Capability / Category"]
+        Backend["RuntimeBackend"]
+        Errors["Domain Exceptions"]
+    end
+
+    subgraph Ports["Port / Abstraction Layer"]
+        RuntimePort["RuntimePort"]
+        RegistryPort["RegistryPort"]
+        DownloaderPort["DownloaderPort"]
+        CachePort["CachePort"]
+        ProgressPort["ProgressPort"]
+        EventPort["EventPort"]
+    end
+
+    subgraph Adapters["Adapter / Infrastructure Layer"]
+        Ollama["OllamaRuntime + stubs:<br/>LM Studio, llama.cpp, Jan, GPT4All, vLLM"]
+        RegistryAdapters["OllamaLibraryRegistry, BundledRegistry,<br/>HuggingFaceCatalogProvider, RemoteRegistry"]
+        Downloaders["HttpDownloader, OllamaPullDownloader"]
+        CacheAdapter["Filesystem Cache"]
+        ProgressAdapters["rich / tqdm / silent"]
+    end
+
+    subgraph CrossCutting["Cross-cutting (common)"]
+        Config["config"]
+        Logging["logging"]
+        Platform["platform utils"]
+        Http["http client"]
+    end
+
+    SDK --> ModelService
+    CLI --> ModelService
+
+    ModelService --> Lifecycle
+    ModelService --> RegistryService
+    ModelService --> DownloadService
+    ModelService --> CacheService
+    ModelService --> ConfigService
+
+    Lifecycle --> RuntimePort
+    Lifecycle --> DownloaderPort
+    Lifecycle --> CachePort
+    Lifecycle --> ProgressPort
+    Lifecycle --> EventPort
+    RegistryService --> RegistryPort
+    DownloadService --> DownloaderPort
+    DownloadService --> ProgressPort
+    CacheService --> CachePort
+
+    Application --> Domain
+
+    RuntimePort -.implemented by.-> Ollama
+    RegistryPort -.implemented by.-> RegistryAdapters
+    DownloaderPort -.implemented by.-> Downloaders
+    CachePort -.implemented by.-> CacheAdapter
+    ProgressPort -.implemented by.-> ProgressAdapters
+
+    Adapters --> CrossCutting
+    Application --> CrossCutting
+```
+
 **Key principle:** Domain and ports know nothing about Ollama, HTTP, or the
 filesystem. The application layer depends only on port *interfaces*. Concrete
 runtimes/downloaders are injected (Dependency Inversion). This is what makes
