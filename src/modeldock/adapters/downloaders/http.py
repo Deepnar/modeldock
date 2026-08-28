@@ -6,6 +6,7 @@ via ProgressPort. See Architecture.md S10.
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 from typing import Any
 
@@ -67,6 +68,19 @@ class HttpDownloader:
         except Exception as exc:
             tmp.unlink(missing_ok=True)
             raise DownloadError(spec.name, reason=str(exc)) from exc
+        variant = spec.default_variant()
+        expected = variant.sha256 if variant else None
+        if expected:
+            actual = _sha256_of(tmp)
+            if actual != expected.lower():
+                tmp.unlink(missing_ok=True)
+                raise DownloadError(
+                    spec.name,
+                    reason=(
+                        f"SHA-256 mismatch (expected {expected}, got {actual})."
+                        " Retry to re-download."
+                    ),
+                )
         tmp.replace(dest)
         return dest
 
@@ -90,6 +104,14 @@ class HttpDownloader:
             )
 
         return variant.download_url
+
+
+def _sha256_of(path: Path, chunk_size: int = 1024 * 1024) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(chunk_size), b""):
+            h.update(chunk)
+    return h.hexdigest()
 
 
 __all__ = ["HttpDownloader"]
