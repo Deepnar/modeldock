@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-__version__ = "0.1.3"
+__version__ = "0.2.0"
 __author__ = "Himanshu kumar"
 
 from modeldock.common.config import Settings
