@@ -102,11 +102,11 @@ pull failed, verify failed). Scripts and CI pipelines cannot detect these
 failures, silently treating them as success.
 
 ### Acceptance criteria
-- [ ] `model-not-found` → exit 1
-- [ ] `pull-failed` → exit 1
-- [ ] `verify-failed` → exit 1
-- [ ] All commands audited; no failure path exits 0
-- [ ] CliRunner tests asserting the correct exit code for each failure case
+- [x] `model-not-found` → exit 1
+- [x] `pull-failed` → exit 1
+- [x] `verify-failed` → exit 1
+- [x] All commands audited; no failure path exits 0
+- [x] CliRunner tests asserting the correct exit code for each failure case
 
 ---
 
@@ -140,5 +140,5 @@ The adapter is vestigial — nothing in the codebase constructs it.
 | 3 | Checksum verification (#68) | `[ ] Not started` |
 | 4 | `update` preserves config (#92) | `[ ] Not started` |
 | 5 | No `basicConfig` at import (#107) | `[ ] Not started` |
-| 6 | Consistent exit codes (#46) | `[ ] Not started` |
+| 6 | Consistent exit codes (#46) | `[x] Done` |
 | 7 | Fix or remove `HttpDownloader` (#185) | `[ ] Not started` |
