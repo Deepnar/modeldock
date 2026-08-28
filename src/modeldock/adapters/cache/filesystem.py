@@ -34,8 +34,8 @@ class FilesystemCache:
             try:
                 tmp.unlink()
                 self._logger.debug("Removed stale temp file: %s", tmp)
-            except OSError:
-                pass
+            except OSError as exc:
+                self._logger.debug("Could not remove stale temp file %s: %s", tmp, exc)
 
     # --- manifest I/O ----------------------------------------------------
 
