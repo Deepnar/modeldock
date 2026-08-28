@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional
 
+import hashlib
+
 import pytest
 
 from modeldock.adapters.downloaders.http import HttpDownloader
@@ -208,11 +210,9 @@ def test_resume_reads_tmp_file_size(tmp_path: Path, patch_client: Any) -> None:
 
 # --- Checksum verification tests ---
 
-import hashlib as _hashlib
-
 
 def _sha256(data: bytes) -> str:
-    return _hashlib.sha256(data).hexdigest()
+    return hashlib.sha256(data).hexdigest()
 
 
 def test_checksum_passes_when_correct(tmp_path: Path, patch_client: Any) -> None:
