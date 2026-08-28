@@ -51,3 +51,22 @@ def test_get_logger_returns_modeldock_child() -> None:
     child = get_logger("cli")
     assert child.name == "modeldock.cli"
     assert get_logger().name == "modeldock"
+
+
+def test_import_does_not_add_root_handlers() -> None:
+    """Importing modeldock must not add handlers to the root logger."""
+    import sys
+
+    saved = {k: sys.modules.pop(k) for k in list(sys.modules) if k.startswith("modeldock")}
+    root_handlers_before = logging.root.handlers[:]
+    logging.root.handlers.clear()
+
+    try:
+        import modeldock  # noqa: F401
+
+        assert logging.root.handlers == [], (
+            f"modeldock polluted the root logger: {logging.root.handlers}"
+        )
+    finally:
+        logging.root.handlers[:] = root_handlers_before
+        sys.modules.update(saved)

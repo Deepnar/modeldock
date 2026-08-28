@@ -43,6 +43,8 @@ def configure(
         overrides["auto_install"] = auto_install
     if log_level is not None:
         overrides["log_level"] = log_level
+        from modeldock.common.logging import configure_logging
+        configure_logging(level=log_level)
     if progress_style is not None:
         overrides["progress_style"] = progress_style
     if cache_dir is not None:
