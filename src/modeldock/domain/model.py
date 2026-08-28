@@ -80,6 +80,7 @@ class ModelVariant(BaseModel):
 
     tag: str
     download_url: Optional[str] = None
+    sha256: Optional[str] = None
     params: Optional[str] = None
     size_bytes: Optional[int] = None
     min_ram: Optional[str] = None

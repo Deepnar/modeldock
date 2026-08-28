@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional
 
@@ -12,7 +13,7 @@ from modeldock.common.errors import DownloadError
 from modeldock.domain.model import Category, ModelSpec, ModelVariant
 
 
-def _spec(url: str = "https://example.com/model.gguf") -> ModelSpec:
+def _spec(url: str = "https://example.com/model.gguf", sha256: Optional[str] = None) -> ModelSpec:
     return ModelSpec(
         name="demo",
         category=Category.CHAT,
@@ -20,6 +21,7 @@ def _spec(url: str = "https://example.com/model.gguf") -> ModelSpec:
             ModelVariant(
                 tag="latest",
                 download_url=url,
+                sha256=sha256,
             )
         ],
         default_tag="latest",
@@ -203,3 +205,44 @@ def test_resume_reads_tmp_file_size(tmp_path: Path, patch_client: Any) -> None:
 
     assert client.ranges == ["bytes=5-"]
     assert dest.read_bytes() == b"helloworld"
+
+
+# --- Checksum verification tests ---
+
+
+def _sha256(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def test_checksum_passes_when_correct(tmp_path: Path, patch_client: Any) -> None:
+    """Download succeeds when the file digest matches the spec."""
+    body = b"abcdef"
+    patch_client([_FakeResponse(200, body)])
+    dest = tmp_path / "model.gguf"
+
+    HttpDownloader(chunk_size=2).download(_spec(sha256=_sha256(body)), dest)
+
+    assert dest.read_bytes() == body
+
+
+def test_checksum_raises_on_mismatch(tmp_path: Path, patch_client: Any) -> None:
+    """A digest mismatch raises DownloadError and leaves no files behind."""
+    patch_client([_FakeResponse(200, b"abcdef")])
+    dest = tmp_path / "model.gguf"
+
+    with pytest.raises(DownloadError, match="SHA-256 mismatch"):
+        HttpDownloader(chunk_size=2).download(_spec(sha256="deadbeef" * 8), dest)
+
+    assert not dest.exists()
+    assert not (tmp_path / "model.gguf.tmp").exists()
+
+
+def test_checksum_skipped_when_absent(tmp_path: Path, patch_client: Any) -> None:
+    """No sha256 in spec → verification is skipped; download succeeds."""
+    body = b"abcdef"
+    patch_client([_FakeResponse(200, body)])
+    dest = tmp_path / "model.gguf"
+
+    HttpDownloader(chunk_size=2).download(_spec(sha256=None), dest)
+
+    assert dest.read_bytes() == body
