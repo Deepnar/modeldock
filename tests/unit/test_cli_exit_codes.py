@@ -125,7 +125,7 @@ def test_install_verify_failure_exits_1(monkeypatch: pytest.MonkeyPatch) -> None
 def test_install_first_failure_aborts_loop(monkeypatch: pytest.MonkeyPatch) -> None:
     """A failure on model A must abort the loop — model B must not be attempted."""
     _SuccessOnSecondManager.second_called = False
-    monkeypatch.setattr(factory, "ModelManager", lambda **kw: _SuccessOnSecondManager(**kw))
+    monkeypatch.setattr(factory, "ModelManager", _SuccessOnSecondManager)
     result = runner.invoke(app, ["install", "ghost-a", "ghost-b"])
     assert result.exit_code == 1
     assert not _SuccessOnSecondManager.second_called
