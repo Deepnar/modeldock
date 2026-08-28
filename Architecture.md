@@ -18,46 +18,20 @@ installation verification, and loading through pluggable runtime adapters.
 
 **Layered (Clean Architecture) view — dependencies point inward:**
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Interface / Delivery Layer                                   │
-│  - Python SDK (modeldock/__init__.py public API)              │
-│  - CLI (modeldock/cli)  → Typer                               │
-└─────────────────────────────────────────────────────────────┘
-                          │ uses
-┌─────────────────────────────────────────────────────────────┐
-│  Application / Use-Case Layer (modeldock/core)                │
-│  - ModelService, RegistryService, DownloadService,           │
-│    CacheService, ConfigService, LifecycleOrchestrator        │
-│  - Orchestrates "load missing → download → verify → load"    │
-└─────────────────────────────────────────────────────────────┘
-                          │ depends on (abstractions)
-┌─────────────────────────────────────────────────────────────┐
-│  Domain Layer (modeldock/domain) — pure, no I/O               │
-│  - Model, ModelSpec, ModelAlias, Capability, Category,       │
-│    RuntimeBackend, DownloadStatus, exceptions                 │
-└─────────────────────────────────────────────────────────────┘
-                          │ implemented by
-┌─────────────────────────────────────────────────────────────┐
-│  Port / Abstraction Layer (modeldock/ports)                   │
-│  - RuntimePort, RegistryPort, DownloaderPort, CachePort,     │
-│    ProgressPort, EventPort                                    │
-└─────────────────────────────────────────────────────────────┘
-                          │ adapters
-┌─────────────────────────────────────────────────────────────┐
-│  Adapter / Infrastructure Layer (modeldock/adapters)         │
-│  - runtimes/ollama.py (first), lmstudio, llamacpp, jan,      │
-│    gpt4all, vllm (future)                                     │
-│  - registry/ (dynamic Ollama catalog + bundled fallback)      │
-│  - downloaders/ (http, ollama-native pull)                   │
-│  - cache/ (filesystem cache)                                 │
-│  - progress/ (rich, tqdm, silent)                            │
-└─────────────────────────────────────────────────────────────┘
-                          │
-┌─────────────────────────────────────────────────────────────┐
-│  Cross-cutting (modeldock/common)                            │
-│  - config, logging, errors, platform utils, http client      │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    Interface["<b>Interface / Delivery Layer</b><br/>Python SDK (modeldock/__init__.py public API)<br/>CLI (modeldock/cli) → Typer"]
+    Application["<b>Application / Use-Case Layer</b> (modeldock/core)<br/>ModelManager, RegistryService, DownloadService,<br/>CacheService, ConfigService, LifecycleOrchestrator<br/><i>Orchestrates: load missing → download → verify → load</i>"]
+    Domain["<b>Domain Layer</b> (modeldock/domain) — pure, no I/O<br/>Model, ModelSpec, ModelAlias, Capability, Category,<br/>RuntimeBackend, SourceInfo, exceptions"]
+    Ports["<b>Port / Abstraction Layer</b> (modeldock/ports)<br/>RuntimePort, RegistryPort, DownloaderPort,<br/>CachePort, ProgressPort, EventPort"]
+    Adapters["<b>Adapter / Infrastructure Layer</b> (modeldock/adapters)<br/>runtimes/ (ollama, lmstudio, llamacpp, jan, gpt4all, vllm)<br/>registry/ (dynamic Ollama + Hugging Face sources, bundled fallback)<br/>downloaders/ (http, ollama-native pull) · cache/ · progress/"]
+    CrossCutting["<b>Cross-cutting</b> (modeldock/common)<br/>config, logging, errors, platform utils, http client"]
+
+    Interface -->|uses| Application
+    Application -->|depends on abstractions| Domain
+    Domain -->|implemented by| Ports
+    Ports -->|adapters| Adapters
+    Adapters --> CrossCutting
 ```
 
 *The diagram below visualizes ModelDock's hexagonal architecture with clear dependency flow from outer layers toward the core domain.*
