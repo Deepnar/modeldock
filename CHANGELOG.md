@@ -6,136 +6,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
-`llama.cpp`: GPU layers configuration. `llama-server` has no API to report or
-set how many layers it offloaded to the GPU — it's a launch-time `-ngl` flag,
-not something a running server can be queried or reconfigured for. Added a
-`llamacpp_gpu_layers` setting (`config.toml` / `MODELDOCK_LLAMACPP_GPU_LAYERS`
-/ llama-server's own `LLAMA_ARG_N_GPU_LAYERS` env var) so the launch commands
-ModelDock suggests (e.g. "server not running") include the right `-ngl` value
-instead of a bare `llama-server -m <model.gguf>`.
+## [0.2.0] - 2026-08-28
+
+Live GGUF catalogs, composite registry, third-party catalog plugins, and
+llama.cpp runtime hardening.
 
 ### Added
 
-- `Settings.llamacpp_gpu_layers` — resolves via `config.toml`, then
-  `MODELDOCK_LLAMACPP_GPU_LAYERS`, then llama-server's own
-  `LLAMA_ARG_N_GPU_LAYERS`; `-1` means "offload all layers"
-- `LlamaCppRuntime(gpu_layers=...)` and the `_resolve_runtime`/`RuntimeRegistry`
+- `Settings.llamacpp_gpu_layers` — configurable GPU layer offload count for
+  llama-server, resolved via `config.toml`, then `MODELDOCK_LLAMACPP_GPU_LAYERS`,
+  then llama-server's own `LLAMA_ARG_N_GPU_LAYERS`; `-1` means "offload all
+  layers"; value is injected into the `-ngl` flag in launch command suggestions
+- `LlamaCppRuntime(gpu_layers=...)` and `_resolve_runtime`/`RuntimeRegistry`
   wiring that forwards the configured value from `ModelManager`
-
----
-
-`llama.cpp`: support GGUF model path resolution. `llama-server` reports the
-filesystem path it was launched with as the model id on `/v1/models` (e.g.
-`/models/llama-3-8b.Q4_K_M.gguf`, or a Windows path with a drive letter), not
-a bare alias. `LlamaCppRuntime` now parses these ids without corrupting
-Windows drive-letter colons, and `is_installed()`/`run()`/`pull()` match a
-user-supplied filename (with or without the `.gguf` extension) against the
-full path llama-server reports, instead of requiring an exact string match.
-
-### Fixed
-
-- `LlamaCppRuntime.list_installed()` no longer mis-parses a Windows GGUF path
-  (`C:\models\model.gguf`) by splitting on the drive letter's colon
-- `LlamaCppRuntime.is_installed()` now matches a bare GGUF filename (with or
-  without extension) against the full path llama-server reports, so
-  `run()`/`pull()`/`get_model_client()` no longer falsely report a loaded
-  model as not installed
-
----
-
-Registry internals refactor — no behavior change. Groundwork for adding new
-live catalog sources (e.g. Hugging Face for LM Studio/llama.cpp) without
-duplicating caching/indexing logic per source.
-
-### Added
-
 - `CachedCatalogRegistry` (`adapters/registry/base.py`) — shared fetch →
   cache → index pipeline and `RegistryPort` implementation for live catalog
   sources
 - `common/catalog_cache.py` — generic TTL'd JSON disk cache (extracted from
   `ollama_library.py`)
 - `CatalogProvider` port (`ports/catalog_provider.py`) — the fetch/parse
-  contract future live catalog sources implement
-
-### Changed
-
-- `OllamaLibraryRegistry` now builds on `CachedCatalogRegistry` instead of
-  duplicating the fetch/cache/index/`RegistryPort` logic inline; scraping,
-  auto-detection, and caching behavior are unchanged
-
----
-
-Live GGUF catalog: LM Studio and llama.cpp category/capability suggestions now
-come from the Hugging Face Hub instead of a hand-maintained static list (or,
-for llama.cpp, nothing at all).
-
-### Added
-
+  contract for live catalog sources
 - `HuggingFaceCatalogProvider` (`adapters/registry/huggingface_catalog.py`) —
-  live catalog built on `CachedCatalogRegistry` that queries the Hugging Face
-  Hub API (`filter=gguf`) for GGUF-format models, cached 24h; LM Studio and
-  llama.cpp share one on-disk cache since both address the same GGUF universe
+  live catalog that queries the Hugging Face Hub API (`filter=gguf`) for
+  GGUF-format models, cached 24h; LM Studio and llama.cpp share one on-disk
+  cache since both address the same GGUF universe
 - `LlamaCppRuntime.models_for_category`/`models_for_capability` — llama.cpp
-  had no catalog of any kind before; category/capability installs previously
-  fell back to the shared Ollama-tag catalog, whose names are not valid
-  `--hf-repo` coordinates
-
-### Changed
-
-- `LMStudioRuntime.models_for_category`/`models_for_capability` now query the
-  live Hugging Face catalog first, falling back to the existing curated
-  `lmstudio_catalog.py` table only when the Hub is unreachable and no cache
-  exists yet — suggestions still work fully offline, they just may be a
-  shorter, point-in-time list instead of the live one
-- `LMStudioRuntime`/`LlamaCppRuntime` accept an optional `cache_dir` argument
-  (defaults to the standard ModelDock cache directory)
-
----
-
-Composite catalog: general discovery (`search`/`list`/`recommend`) now spans
-every source relevant to the active backend, not just Ollama's.
-
-### Added
-
+  previously had no catalog; category/capability installs fell back to the
+  Ollama-tag catalog, whose names are not valid `--hf-repo` coordinates
 - `CompositeRegistry` (`adapters/registry/composite.py`) — merges an ordered
   list of `RegistryPort` sources; earlier sources win on a name collision,
   `get()` returns the first source that resolves the reference
-
-### Changed
-
-- `ModelManager._resolve_registry` under `catalog_source="auto"` (the
-  default) now merges the active backend's own live catalog with the general
-  one when it has one — LM Studio/llama.cpp get a `CompositeRegistry` of
-  `[HuggingFaceCatalogProvider, <ollama-or-bundled>]`, so `md.search()`/
-  `md.list()`/`md.recommend()` surface models that backend can actually
-  install. Ollama (and any backend without its own catalog) is unaffected —
-  no composite is built, exactly as before. `catalog_source="ollama"` /
-  `"bundled"` remain explicit single-source opt-outs with no merge and no
-  extra network calls, unchanged from before
-
----
-
-Third-party catalog plugins: live catalog sources are now as pluggable as
-runtimes, via the same entry-point mechanism.
-
-### Added
-
 - `CatalogProviderRegistry` (`adapters/registry/catalog_registry.py`) —
   resolves a `RuntimeBackend` to its own live catalog: built-ins (Hugging
   Face for LM Studio/llama.cpp) plus third-party plugins discovered via the
   `modeldock.catalog_providers` entry-point group, mirroring how
-  `RuntimeRegistry` already discovers third-party `modeldock.runtimes`
-  plugins. A plugin is a callable `(cache_dir: Path) -> RegistryPort`; entry
-  points take priority over built-ins, so a plugin can also replace the
-  shipped Hugging Face provider
+  `RuntimeRegistry` discovers `modeldock.runtimes` plugins. A plugin is a
+  callable `(cache_dir: Path) -> RegistryPort`; entry points take priority
+  over built-ins, so a plugin can also replace the shipped Hugging Face provider
 
 ### Changed
 
+- `OllamaLibraryRegistry` now builds on `CachedCatalogRegistry` instead of
+  duplicating fetch/cache/index/`RegistryPort` logic inline; behavior unchanged
+- `LMStudioRuntime.models_for_category`/`models_for_capability` now query the
+  live Hugging Face catalog first, falling back to the curated
+  `lmstudio_catalog.py` table only when the Hub is unreachable and no cache
+  exists — suggestions still work fully offline, but may be a point-in-time
+  list instead of the live one
+- `LMStudioRuntime`/`LlamaCppRuntime` accept an optional `cache_dir` argument
+  (defaults to the standard ModelDock cache directory)
+- `ModelManager._resolve_registry` under `catalog_source="auto"` now merges
+  the active backend's own live catalog with the general one when available —
+  LM Studio/llama.cpp get a `CompositeRegistry` of
+  `[HuggingFaceCatalogProvider, <ollama-or-bundled>]`, so `search()`/`list()`/
+  `recommend()` surface models that backend can actually install. Ollama and
+  backends without their own catalog are unaffected. `catalog_source="ollama"`
+  / `"bundled"` remain explicit single-source opt-outs with no extra network
+  calls
 - `ModelManager._resolve_backend_catalog` now resolves through
-  `CatalogProviderRegistry` instead of hardcoding
-  `HuggingFaceCatalogProvider`/a fixed backend allowlist — behavior for LM
-  Studio/llama.cpp is unchanged, but any backend with a registered catalog
-  plugin (built-in or third-party) is now picked up automatically
+  `CatalogProviderRegistry` instead of hardcoding `HuggingFaceCatalogProvider`
+  — any backend with a registered catalog plugin is now picked up automatically
+
+### Fixed
+
+- `LlamaCppRuntime.list_installed()` no longer mis-parses Windows GGUF paths
+  (`C:\models\model.gguf`) by splitting on the drive-letter colon
+- `LlamaCppRuntime.is_installed()` now matches a bare GGUF filename (with or
+  without `.gguf` extension) against the full path llama-server reports, so
+  `run()`/`pull()`/`get_model_client()` no longer falsely report a loaded
+  model as not installed
 
 ## [0.1.3] - 2026-07-19
 
@@ -251,6 +190,7 @@ This project follows [Semantic Versioning](https://semver.org/):
 
 ## Links
 
+[0.2.0]: https://github.com/OpenAgentHQ/modeldock/compare/v0.1.3...v0.2.0
 [0.1.3]: https://github.com/OpenAgentHQ/modeldock/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/OpenAgentHQ/modeldock/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/OpenAgentHQ/modeldock/compare/v0.1.0...v0.1.1
