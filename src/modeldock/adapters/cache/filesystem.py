@@ -25,6 +25,17 @@ class FilesystemCache:
         self._manifest_path = self._cache_dir / "manifest.json"
         self._logger = get_logger("cache.filesystem")
         self._cache_dir.mkdir(parents=True, exist_ok=True)
+        self._cleanup_tmp_files()
+
+    def _cleanup_tmp_files(self) -> None:
+        for tmp in self._cache_dir.rglob("*.tmp"):
+            if tmp.name == "manifest.tmp":
+                continue
+            try:
+                tmp.unlink()
+                self._logger.debug("Removed stale temp file: %s", tmp)
+            except OSError as exc:
+                self._logger.debug("Could not remove stale temp file %s: %s", tmp, exc)
 
     # --- manifest I/O ----------------------------------------------------
 
@@ -86,6 +97,7 @@ class FilesystemCache:
                 del entries[key]
         if removed:
             self._write_manifest(data)
+        self._cleanup_tmp_files()
         return removed
 
     def evict(self, ref: ModelRef) -> None:

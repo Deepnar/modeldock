@@ -94,7 +94,7 @@ def test_download_fresh_writes_whole_body(tmp_path: Path, patch_client: Any) -> 
 def test_download_resumes_when_server_honors_range(tmp_path: Path, patch_client: Any) -> None:
     client = patch_client([_FakeResponse(206, b"def")])
     dest = tmp_path / "model.gguf"
-    dest.write_bytes(b"abc")
+    (tmp_path / "model.gguf.tmp").write_bytes(b"abc")
 
     HttpDownloader(chunk_size=2).download(_spec(), dest)
 
@@ -106,7 +106,7 @@ def test_download_restarts_when_server_ignores_range(tmp_path: Path, patch_clien
     """A 200 reply carries the whole body; appending it would corrupt the file."""
     patch_client([_FakeResponse(200, b"abcdef")])
     dest = tmp_path / "model.gguf"
-    dest.write_bytes(b"abc")
+    (tmp_path / "model.gguf.tmp").write_bytes(b"abc")
 
     HttpDownloader(chunk_size=2).download(_spec(), dest)
 
@@ -117,7 +117,7 @@ def test_download_restarts_on_range_not_satisfiable(tmp_path: Path, patch_client
     """A stale partial file (HTTP 416) is discarded and re-fetched, not an error."""
     client = patch_client([_FakeResponse(416, b""), _FakeResponse(200, b"abcdef")])
     dest = tmp_path / "model.gguf"
-    dest.write_bytes(b"abcdefghij")  # longer than the resource
+    (tmp_path / "model.gguf.tmp").write_bytes(b"abcdefghij")  # longer than the resource
 
     HttpDownloader(chunk_size=2).download(_spec(), dest)
 
@@ -162,3 +162,44 @@ def test_missing_variant_download_url_raises() -> None:
 
     with pytest.raises(DownloadError, match="No download_url"):
         HttpDownloader._url_for(spec)
+
+
+def test_tmp_file_absent_after_successful_download(tmp_path: Path, patch_client: Any) -> None:
+    """The .tmp staging file must be gone after a successful download."""
+    patch_client([_FakeResponse(200, b"abcdef")])
+    dest = tmp_path / "model.gguf"
+
+    HttpDownloader(chunk_size=2).download(_spec(), dest)
+
+    assert dest.read_bytes() == b"abcdef"
+    assert not (tmp_path / "model.gguf.tmp").exists()
+
+
+def test_tmp_file_cleaned_up_on_interrupted_download(tmp_path: Path, patch_client: Any) -> None:
+    """An exception mid-stream must delete the .tmp file and not create dest."""
+
+    class _BrokenResponse(_FakeResponse):
+        def iter_bytes(self, chunk_size: int) -> Iterator[bytes]:
+            yield b"abc"
+            raise OSError("simulated network failure")
+
+    patch_client([_BrokenResponse(200, b"abcdef")])
+    dest = tmp_path / "model.gguf"
+
+    with pytest.raises(DownloadError):
+        HttpDownloader(chunk_size=2).download(_spec(), dest)
+
+    assert not dest.exists()
+    assert not (tmp_path / "model.gguf.tmp").exists()
+
+
+def test_resume_reads_tmp_file_size(tmp_path: Path, patch_client: Any) -> None:
+    """A pre-existing .tmp file causes a Range header for its byte count."""
+    client = patch_client([_FakeResponse(206, b"world")])
+    dest = tmp_path / "model.gguf"
+    (tmp_path / "model.gguf.tmp").write_bytes(b"hello")
+
+    HttpDownloader(chunk_size=16).download(_spec(), dest)
+
+    assert client.ranges == ["bytes=5-"]
+    assert dest.read_bytes() == b"helloworld"
