@@ -36,6 +36,15 @@ class DownloadService:
         result = self._runtime.pull(ref, self._progress)
         if not result.success:
             raise DownloadError(ref.name, reason=result.error or "unknown")
+        # Verify the model is present before committing the cache entry.
+        # If the runtime reports success but the model isn't installed, evict
+        # any stale prior entry and raise so the caller can retry cleanly.
+        if not self._runtime.is_installed(ref):
+            self._cache.evict(ref)
+            raise DownloadError(
+                ref.name,
+                reason="model pull reported success but model is not present in runtime",
+            )
         self._cache.record(
             ref=ref,
             tag=ref.tag,

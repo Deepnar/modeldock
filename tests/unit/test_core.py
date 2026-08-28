@@ -8,6 +8,7 @@ from modeldock.common.errors import DownloadError, ModelNotFoundError, ModelNotI
 from modeldock.core.download import DownloadService
 from modeldock.core.lifecycle import LifecycleOrchestrator
 from modeldock.domain.model import ModelRef
+from tests.conftest import FakeRuntime
 
 
 def test_download_pull_records_on_success(
@@ -25,6 +26,24 @@ def test_download_pull_raises_on_failure(fake_runtime: object, fake_cache: objec
     svc = DownloadService(fake_runtime, fake_cache)
     with pytest.raises(DownloadError):
         svc.pull(ModelRef.parse("llama3"))
+
+
+def test_download_pull_raises_and_no_cache_entry_when_verify_fails(fake_cache: object) -> None:
+    runtime = FakeRuntime(verify_should_fail=True)
+    svc = DownloadService(runtime, fake_cache)
+    with pytest.raises(DownloadError):
+        svc.pull(ModelRef.parse("llama3"))
+    assert not fake_cache.is_fresh(ModelRef.parse("llama3"))
+
+
+def test_download_pull_evicts_stale_entry_when_verify_fails(fake_cache: object) -> None:
+    ref = ModelRef.parse("llama3")
+    fake_cache.record(ref, "latest", "stale", 0)
+    runtime = FakeRuntime(verify_should_fail=True)
+    svc = DownloadService(runtime, fake_cache)
+    with pytest.raises(DownloadError):
+        svc.pull(ref)
+    assert not fake_cache.is_fresh(ref)
 
 
 def test_download_verify(fake_runtime: object, fake_cache: object) -> None:

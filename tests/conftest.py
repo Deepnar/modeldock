@@ -82,6 +82,9 @@ class FakeCache(CachePort):
     def get_record(self, ref: ModelRef) -> Optional[dict]:
         return self.entries.get(self._key(ref))
 
+    def evict(self, ref: ModelRef) -> None:
+        self.entries.pop(self._key(ref), None)
+
     def clean(self, force: bool = False) -> List[str]:
         removed = [k for k, v in self.entries.items() if force or not v.get("sha256")]
         for k in removed:
@@ -107,10 +110,12 @@ class FakeRuntime(RuntimePort):
         available: bool = True,
         installed: Optional[List[ModelRef]] = None,
         pull_should_fail: bool = False,
+        verify_should_fail: bool = False,
     ) -> None:
         self._available = available
         self._installed = installed or []
         self.pull_should_fail = pull_should_fail
+        self.verify_should_fail = verify_should_fail
         self.pulled: List[ModelRef] = []
         self.removed: List[ModelRef] = []
         self.clients: List[ModelRef] = []
@@ -127,7 +132,8 @@ class FakeRuntime(RuntimePort):
     def pull(self, ref: ModelRef, progress: Any = None) -> PullResult:
         if self.pull_should_fail:
             return PullResult(ref=ref, success=False, error="boom")
-        self._installed.append(ref)
+        if not self.verify_should_fail:
+            self._installed.append(ref)
         self.pulled.append(ref)
         return PullResult(ref=ref, success=True, bytes_downloaded=10)
 

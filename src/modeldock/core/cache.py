@@ -25,6 +25,10 @@ class CacheService:
         """Record an installed/downloaded artifact."""
         self._cache.record(ref, tag, sha256, size_bytes)
 
+    def evict(self, ref: ModelRef) -> None:
+        """Remove a cache entry for ``ref`` (rollback helper)."""
+        self._cache.evict(ref)
+
     def status(self) -> List[Dict[str, Any]]:
         """Return a snapshot of cached entries."""
         return self._cache.status()
