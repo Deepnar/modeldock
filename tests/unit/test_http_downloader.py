@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional
-
-import hashlib
 
 import pytest
 
