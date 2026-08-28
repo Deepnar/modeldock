@@ -68,7 +68,9 @@ class FilesystemCache:
 
     def record(self, ref: ModelRef, tag: str, sha256: str, size_bytes: int) -> None:
         data = self._read_manifest()
-        data.setdefault("entries", {})[self._key(ref)] = {
+        entries = data.setdefault("entries", {})
+        existing = entries.get(self._key(ref), {})
+        entry: Dict[str, Any] = {
             "name": ref.name,
             "tag": tag,
             "sha256": sha256,
@@ -76,6 +78,9 @@ class FilesystemCache:
             "pulled_at": int(time.time()),
             "source": ref.backend.value if ref.backend else "unknown",
         }
+        if "user_config" in existing:
+            entry["user_config"] = existing["user_config"]
+        entries[self._key(ref)] = entry
         self._write_manifest(data)
 
     def get_record(self, ref: ModelRef) -> Optional[Dict[str, Any]]:
@@ -114,6 +119,19 @@ class FilesystemCache:
         return str(self._cache_dir)
 
     # --- content hashing helper -------------------------------------------
+
+    def get_model_config(self, ref: ModelRef) -> Optional[Dict[str, Any]]:
+        data = self._read_manifest()
+        entry = data.get("entries", {}).get(self._key(ref))
+        if entry is None:
+            return None
+        return cast(Optional[Dict[str, Any]], entry.get("user_config"))
+
+    def set_model_config(self, ref: ModelRef, config: Dict[str, Any]) -> None:
+        data = self._read_manifest()
+        entries = data.setdefault("entries", {})
+        entries.setdefault(self._key(ref), {})["user_config"] = config
+        self._write_manifest(data)
 
     @staticmethod
     def sha256_of(path: Path, chunk_size: int = 1024 * 1024) -> str:

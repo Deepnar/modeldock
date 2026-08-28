@@ -319,8 +319,11 @@ class ModelManager:
                     "Pass confirm=True to proceed."
                 ),
             )
+        user_cfg = self._cache_port.get_model_config(ref)
         self._runtime.remove(ref)
         self._download.pull(ref)
+        if user_cfg is not None:
+            self._cache_port.set_model_config(ref, user_cfg)
         return ref
 
     def remove(self, name: str) -> None:

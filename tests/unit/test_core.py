@@ -144,6 +144,16 @@ def test_manager_update_cloud_model_raises(manager_with_fakes: object) -> None:
         mgr.update("glm-5.2:cloud", confirm=True)
 
 
+def test_manager_update_preserves_user_config(manager_with_fakes: object) -> None:
+    mgr = manager_with_fakes
+    mgr.install("llama3")
+    ref = ModelRef.parse("llama3")
+    mgr._cache_port.set_model_config(ref, {"temperature": 0.7, "system": "You are helpful."})
+    mgr.update("llama3", confirm=True)
+    config = mgr._cache_port.get_model_config(ref)
+    assert config == {"temperature": 0.7, "system": "You are helpful."}
+
+
 def test_manager_remove(manager_with_fakes: object) -> None:
     mgr = manager_with_fakes
     mgr.install("llama3")
