@@ -114,3 +114,33 @@ def test_cache_service_path_returns_real_dir(tmp_path: Path) -> None:
 def test_filesystem_cache_path_returns_cache_dir(tmp_path: Path) -> None:
     cache = FilesystemCache(tmp_path)
     assert cache.path() == str(tmp_path)
+
+
+def test_filesystem_cache_removes_stale_tmp_on_init(tmp_path: Path) -> None:
+    stale = tmp_path / "model.gguf.tmp"
+    stale.write_bytes(b"partial data")
+
+    FilesystemCache(tmp_path)
+
+    assert not stale.exists()
+
+
+def test_filesystem_cache_manifest_tmp_survives_cleanup(tmp_path: Path) -> None:
+    """manifest.tmp written by _write_manifest must not be wiped by cleanup."""
+    manifest_tmp = tmp_path / "manifest.tmp"
+    manifest_tmp.write_text("{}")
+
+    FilesystemCache(tmp_path)
+
+    assert manifest_tmp.exists()
+
+
+def test_filesystem_cache_clean_removes_tmp_files(tmp_path: Path) -> None:
+    stale = tmp_path / "model.gguf.tmp"
+    stale.write_bytes(b"partial data")
+    cache = FilesystemCache(tmp_path)
+    stale.write_bytes(b"partial data")  # re-create after init cleanup
+
+    cache.clean()
+
+    assert not stale.exists()

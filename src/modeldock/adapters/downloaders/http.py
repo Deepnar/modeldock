@@ -25,7 +25,8 @@ class HttpDownloader:
     def download(self, spec: ModelSpec, dest: Path, progress: Any = None) -> Path:
         url = self._url_for(spec)
         dest.parent.mkdir(parents=True, exist_ok=True)
-        existing = dest.stat().st_size if dest.exists() else 0
+        tmp = dest.with_suffix(dest.suffix + ".tmp")
+        existing = tmp.stat().st_size if tmp.exists() else 0
         headers = {"Range": f"bytes={existing}-"} if existing else {}
         header_name = "Content" + "-" + "Length"
         try:
@@ -37,7 +38,7 @@ class HttpDownloader:
                         "Stale partial file for %s (HTTP 416); restarting download", spec.name
                     )
                     resp.close()
-                    dest.unlink(missing_ok=True)
+                    tmp.unlink(missing_ok=True)
                     return self.download(spec, dest, progress)
                 resp.raise_for_status()
                 # Only append when the server actually honored the Range
@@ -56,7 +57,7 @@ class HttpDownloader:
                 if progress is not None:
                     progress.start(total=total, desc=f"Download {spec.name}")
                 mode = "ab" if resumed else "wb"
-                with dest.open(mode) as fh:
+                with tmp.open(mode) as fh:
                     for chunk in resp.iter_bytes(self._chunk_size):
                         fh.write(chunk)
                         if progress is not None:
@@ -64,7 +65,9 @@ class HttpDownloader:
                 if progress is not None:
                     progress.finish(desc=f"Downloaded {spec.name}")
         except Exception as exc:
+            tmp.unlink(missing_ok=True)
             raise DownloadError(spec.name, reason=str(exc)) from exc
+        tmp.replace(dest)
         return dest
 
     def pull(self, ref: ModelRef, progress: Any = None) -> Any:
