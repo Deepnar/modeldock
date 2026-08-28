@@ -20,6 +20,7 @@ def info_cmd(
         typer.echo(f"Category:    {spec.category.value}")
         typer.echo(f"Capabilities:{', '.join(c.value for c in spec.capabilities)}")
         typer.echo(f"Default tag: {spec.default_tag}")
+        typer.echo(f"Source:      {spec.source or '-'}")
         typer.echo(f"Description: {spec.description}")
         if spec.installed:
             typer.echo(f"Installed:   yes (tags: {', '.join(spec.installed_tags)})")

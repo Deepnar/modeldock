@@ -86,7 +86,30 @@ Models present locally. Returns `list[ModelRef]`.
 
 ### `info(name)`
 
-Sizes, capabilities, variants. Returns model info object.
+Sizes, capabilities, variants, and source provenance (`.source`). Returns a
+model info object.
+
+---
+
+### `resolve(name)`
+
+Resolve a friendly name/alias to its canonical catalog spec, including which
+source it came from (`spec.source`). Raises `ModelNotFoundError` when unknown.
+Returns `ModelSpec`.
+
+---
+
+### `versions(name)`
+
+Known version tags a source exposes for a model (e.g. `["latest", "8b", "4b"]`).
+Returns `list[str]` (empty when unknown).
+
+---
+
+### `sources()`
+
+Describe the active model sources feeding discovery — name, trust level,
+live/static kind, backend, and model count. Returns `list[SourceInfo]`.
 
 ---
 
@@ -160,7 +183,8 @@ mgr = md.Manager(
 ```python
 __all__ = [
     "load", "list", "search", "installed", "info", "categories",
-    "recommend", "install", "install_category", "update", "remove",
+    "recommend", "resolve", "versions", "sources",
+    "install", "install_category", "update", "remove",
     "verify", "run", "cache", "configure", "Manager", "ModelManager",
     "ModelRef", "RuntimeBackend", "Category",
 ]

@@ -29,14 +29,33 @@ class RuntimePort(Protocol):
 
 ## RegistryPort
 
+A `RegistryPort` implementation *is* a ModelDock **model source** — it answers
+"what models exist" from an external source of truth (ollama.com, the Hugging
+Face Hub, a plugin), not from a hand-maintained file.
+
 ```python
 class RegistryPort(Protocol):
     def search(self, query: str) -> list: ...
     def get(self, ref: ModelRef) -> ModelSpec | None: ...
+    def resolve(self, ref: ModelRef) -> ModelSpec: ...   # friendly name → canonical identity
+    def versions(self, ref: ModelRef) -> list[str]: ...  # known version tags for a model
     def by_category(self, cat: Category) -> list: ...
     def recommend(self, task: str) -> list: ...
     def list_all(self) -> list: ...
 ```
+
+Concrete sources additionally expose, for observability and refresh:
+
+```python
+    def describe(self) -> list[SourceInfo]: ...   # self-description for `modeldock sources`
+    def refresh(self) -> int: ...                 # live sources: re-fetch, bypass cache TTL
+```
+
+Every spec a source emits carries provenance in `ModelSpec.source` (e.g.
+`"Ollama Official"`, `"Hugging Face"`), stamped centrally by the source's
+index pipeline. `SourceInfo` (`domain/source.py`) is pure data — name, trust
+(`official`/`verified`/`community`/`bundled`/`custom`), live-vs-static,
+backend, model count, cache path.
 
 ---
 

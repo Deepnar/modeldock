@@ -100,6 +100,11 @@ class ModelSpec(BaseModel):
     variants: List[ModelVariant] = Field(default_factory=list)
     description: str = ""
     backend_hints: List[RuntimeBackend] = Field(default_factory=list)
+    #: Human-facing provenance label of the source this spec came from
+    #: (e.g. "Ollama Official", "Hugging Face"). ``None`` when unknown, so a
+    #: spec built from a bare local ref carries no false provenance. Stamped by
+    #: each registry adapter; see ``domain/source.py``.
+    source: Optional[str] = None
 
     def default_variant(self) -> Optional[ModelVariant]:
         """Return the variant matching ``default_tag``, if present."""
@@ -107,6 +112,21 @@ class ModelSpec(BaseModel):
             if variant.tag == self.default_tag:
                 return variant
         return None
+
+    def version_tags(self) -> List[str]:
+        """Return the known version tags for this model.
+
+        The default tag leads, followed by every variant tag, deduplicated
+        with order preserved. Used by ``RegistryPort.versions`` so callers can
+        enumerate a model's variants without reaching into ``variants``.
+        """
+        tags: List[str] = []
+        if self.default_tag:
+            tags.append(self.default_tag)
+        for variant in self.variants:
+            if variant.tag not in tags:
+                tags.append(variant.tag)
+        return tags
 
     @classmethod
     def from_ref(cls, ref: ModelRef) -> ModelSpec:
@@ -140,6 +160,7 @@ class ModelInfo(BaseModel):
     variants: List[ModelVariant] = Field(default_factory=list)
     description: str = ""
     backend_hints: List[RuntimeBackend] = Field(default_factory=list)
+    source: Optional[str] = None
     installed_tags: List[str] = Field(default_factory=list)
     installed: bool = False
 
@@ -156,6 +177,7 @@ class ModelInfo(BaseModel):
             variants=list(spec.variants),
             description=spec.description,
             backend_hints=list(spec.backend_hints),
+            source=spec.source,
             installed_tags=tags,
             installed=bool(tags),
         )

@@ -18,7 +18,11 @@ from modeldock.common.logging import get_logger
 from modeldock.domain.model import RuntimeBackend
 from modeldock.ports.registry import RegistryPort
 
-_ENTRY_POINT_GROUP = "modeldock.catalog_providers"
+# Preferred group name is ``modeldock.model_sources`` (a source *is* a model
+# source); ``modeldock.catalog_providers`` is the original name, kept so
+# existing plugins keep working. Both are scanned; a backend registered under
+# either group is discovered.
+_ENTRY_POINT_GROUPS = ("modeldock.model_sources", "modeldock.catalog_providers")
 
 #: Built-in factories: backend -> (cache_dir) -> RegistryPort.
 _BUILTIN: Dict[RuntimeBackend, Callable[[Path], RegistryPort]] = {}
@@ -56,15 +60,19 @@ class CatalogProviderRegistry:
     def _discover_entry_points(self) -> None:
         try:
             eps = entry_points()
-            if hasattr(eps, "select"):
-                group: Any = eps.select(group=_ENTRY_POINT_GROUP)
-            else:
-                group = list(eps.get(_ENTRY_POINT_GROUP, []))
-            for ep in group:
+            discovered: List[Any] = []
+            for group_name in _ENTRY_POINT_GROUPS:
+                if hasattr(eps, "select"):
+                    discovered.extend(eps.select(group=group_name))
+                else:
+                    discovered.extend(eps.get(group_name, []))
+            for ep in discovered:
                 try:
                     backend = RuntimeBackend.from_value(ep.name)
                     factory = ep.load()
-                    self._entry_points[backend] = factory
+                    # First group wins on a duplicate registration, so the
+                    # preferred ``modeldock.model_sources`` name takes priority.
+                    self._entry_points.setdefault(backend, factory)
                 except Exception as exc:  # skip bad plugins
                     self._logger.warning("Skipping catalog provider plugin %s: %s", ep.name, exc)
         except Exception as exc:

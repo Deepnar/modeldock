@@ -20,6 +20,7 @@ from modeldock.domain.model import (
     ModelSpec,
     RuntimeBackend,
 )
+from modeldock.domain.source import BUNDLED, SourceInfo, SourceTrust
 
 _CATALOG_FILENAME = "catalog.json"
 
@@ -52,6 +53,8 @@ class BundledRegistry:
     def _index(self) -> None:
         for raw in _load_catalog():
             spec = self._to_spec(raw)
+            if spec.source is None:
+                spec.source = BUNDLED
             self._specs[spec.name] = spec
             for alias in spec.aliases:
                 self._by_alias[alias.lower()] = spec.name
@@ -75,6 +78,31 @@ class BundledRegistry:
         if name is None:
             raise ModelNotFoundError(ref.name)
         return self._specs[name]
+
+    def resolve(self, ref: ModelRef) -> ModelSpec:
+        """Resolve a friendly/alias ``ref`` to its canonical spec."""
+        return self.get(ref)
+
+    def versions(self, ref: ModelRef) -> List[str]:
+        """Return known version tags for ``ref`` (empty when unknown)."""
+        try:
+            return self.get(ref).version_tags()
+        except ModelNotFoundError:
+            return []
+
+    def describe(self) -> List[SourceInfo]:
+        """Describe the bundled fallback source (static, never primary)."""
+        return [
+            SourceInfo(
+                name=BUNDLED,
+                trust=SourceTrust.BUNDLED,
+                live=False,
+                backend=None,
+                model_count=len(self._specs),
+                cache_path=str(_catalog_path()),
+                available=bool(self._specs),
+            )
+        ]
 
     def by_category(self, category: Category) -> List[ModelSpec]:
         return [s for s in self._specs.values() if s.category == category]

@@ -6,6 +6,44 @@ Based on [Keep a Changelog](https://keepachangelog.com/) and [Semantic Versionin
 
 ---
 
+## [Unreleased]
+
+Model-source observability and a first-class source interface. Dynamic
+discovery is documented as the source of truth; `catalog.json` is confirmed as
+an emergency offline fallback only.
+
+### Added
+
+- **Provenance** — `ModelSpec.source` / `ModelInfo.source`: every source stamps
+  a human-facing label (`"Ollama Official"`, `"Hugging Face"`, `"Bundled
+  (offline fallback)"`). Surfaced in `search` output (new `Source` column) and
+  `info` (new `Source:` line). New value objects `SourceInfo` / `SourceTrust`
+  in `domain/source.py`.
+- **Source interface** — `RegistryPort.resolve(ref)` (friendly name → canonical
+  identity), `RegistryPort.versions(ref)` (known version tags), plus
+  `describe()` and `refresh()` on concrete sources. `ModelSpec.version_tags()`.
+- **CLI** — `modeldock sources` (list active sources with trust/kind/backend/
+  count/status) and `modeldock sources refresh` (force live re-fetch, bypassing
+  the discovery-cache TTL).
+- **SDK** — `md.resolve()`, `md.versions()`, `md.sources()` top-level functions
+  (additive; existing API unchanged).
+- **Plugins** — preferred `modeldock.model_sources` entry-point group for
+  third-party model sources; the legacy `modeldock.catalog_providers` group is
+  still scanned for backward compatibility.
+
+### Changed
+
+- Docs (`Architecture.md`, discover / CLI / ports / python-api / catalog-provider
+  guides) updated to state plainly that dynamic discovery is the source of
+  truth and `catalog.json` is fallback-only.
+
+### Tests
+
+- New `tests/unit/test_sources.py` plus e2e coverage for `sources`,
+  `sources refresh`, and `info` provenance.
+
+---
+
 ## [0.1.3] - 2026-07-19
 
 Dynamic catalog: replaced static `catalog.json` with live scraping of ollama.com.

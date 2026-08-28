@@ -23,6 +23,7 @@ from modeldock.domain.model import (
     ModelSpec,
     RuntimeBackend,
 )
+from modeldock.domain.source import OLLAMA_OFFICIAL, SourceTrust
 
 _LIBRARY_URL = "https://ollama.com/library"
 _CACHE_FILENAME = "catalog_cache.json"
@@ -193,7 +194,14 @@ class OllamaLibraryRegistry(CachedCatalogRegistry):
     """
 
     def __init__(self, cache_dir: Path) -> None:
-        super().__init__(cache_dir, _CACHE_FILENAME, "registry.ollama_library")
+        super().__init__(
+            cache_dir,
+            _CACHE_FILENAME,
+            "registry.ollama_library",
+            source_name=OLLAMA_OFFICIAL,
+            source_trust=SourceTrust.OFFICIAL,
+            source_backend=RuntimeBackend.OLLAMA,
+        )
 
     def _load_cache(self) -> Optional[List[Dict[str, Any]]]:
         return _load_cache(self._cache_path)

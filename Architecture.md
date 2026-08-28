@@ -18,46 +18,20 @@ installation verification, and loading through pluggable runtime adapters.
 
 **Layered (Clean Architecture) view — dependencies point inward:**
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Interface / Delivery Layer                                   │
-│  - Python SDK (modeldock/__init__.py public API)              │
-│  - CLI (modeldock/cli)  → Typer                               │
-└─────────────────────────────────────────────────────────────┘
-                          │ uses
-┌─────────────────────────────────────────────────────────────┐
-│  Application / Use-Case Layer (modeldock/core)                │
-│  - ModelService, RegistryService, DownloadService,           │
-│    CacheService, ConfigService, LifecycleOrchestrator        │
-│  - Orchestrates "load missing → download → verify → load"    │
-└─────────────────────────────────────────────────────────────┘
-                          │ depends on (abstractions)
-┌─────────────────────────────────────────────────────────────┐
-│  Domain Layer (modeldock/domain) — pure, no I/O               │
-│  - Model, ModelSpec, ModelAlias, Capability, Category,       │
-│    RuntimeBackend, DownloadStatus, exceptions                 │
-└─────────────────────────────────────────────────────────────┘
-                          │ implemented by
-┌─────────────────────────────────────────────────────────────┐
-│  Port / Abstraction Layer (modeldock/ports)                   │
-│  - RuntimePort, RegistryPort, DownloaderPort, CachePort,     │
-│    ProgressPort, EventPort                                    │
-└─────────────────────────────────────────────────────────────┘
-                          │ adapters
-┌─────────────────────────────────────────────────────────────┐
-│  Adapter / Infrastructure Layer (modeldock/adapters)         │
-│  - runtimes/ollama.py (first), lmstudio, llamacpp, jan,      │
-│    gpt4all, vllm (future)                                     │
-│  - registry/ (dynamic Ollama catalog + bundled fallback)      │
-│  - downloaders/ (http, ollama-native pull)                   │
-│  - cache/ (filesystem cache)                                 │
-│  - progress/ (rich, tqdm, silent)                            │
-└─────────────────────────────────────────────────────────────┘
-                          │
-┌─────────────────────────────────────────────────────────────┐
-│  Cross-cutting (modeldock/common)                            │
-│  - config, logging, errors, platform utils, http client      │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    Interface["<b>Interface / Delivery Layer</b><br/>Python SDK (modeldock/__init__.py public API)<br/>CLI (modeldock/cli) → Typer"]
+    Application["<b>Application / Use-Case Layer</b> (modeldock/core)<br/>ModelManager, RegistryService, DownloadService,<br/>CacheService, ConfigService, LifecycleOrchestrator<br/><i>Orchestrates: load missing → download → verify → load</i>"]
+    Domain["<b>Domain Layer</b> (modeldock/domain) — pure, no I/O<br/>Model, ModelSpec, ModelAlias, Capability, Category,<br/>RuntimeBackend, SourceInfo, exceptions"]
+    Ports["<b>Port / Abstraction Layer</b> (modeldock/ports)<br/>RuntimePort, RegistryPort, DownloaderPort,<br/>CachePort, ProgressPort, EventPort"]
+    Adapters["<b>Adapter / Infrastructure Layer</b> (modeldock/adapters)<br/>runtimes/ (ollama, lmstudio, llamacpp, jan, gpt4all, vllm)<br/>registry/ (dynamic Ollama + Hugging Face sources, bundled fallback)<br/>downloaders/ (http, ollama-native pull) · cache/ · progress/"]
+    CrossCutting["<b>Cross-cutting</b> (modeldock/common)<br/>config, logging, errors, platform utils, http client"]
+
+    Interface -->|uses| Application
+    Application -->|depends on abstractions| Domain
+    Domain -->|implemented by| Ports
+    Ports -->|adapters| Adapters
+    Adapters --> CrossCutting
 ```
 
 *The diagram below visualizes ModelDock's hexagonal architecture with clear dependency flow from outer layers toward the core domain.*
@@ -349,6 +323,8 @@ modeldock info <model>
 modeldock recommend [--task coding]
 modeldock update <model>...
 modeldock remove <model>...
+modeldock sources                         # list active model sources + status
+modeldock sources refresh                 # force live sources to re-fetch
 modeldock cache status
 modeldock cache clean
 modeldock cache path
@@ -357,6 +333,16 @@ modeldock config set <key> <value>
 modeldock --version
 modeldock --help
 ```
+
+- `search` is the discovery entry point: it queries the live sources for the
+  active backend and shows each result's provenance (`Source` column) so users
+  never need to know which source holds a model.
+- `list` primarily surfaces the known catalog; `installed` is the locally
+  present models.
+- `sources` reports where discovered models come from (Ollama Official,
+  Hugging Face, bundled fallback, plugins) and whether each source is
+  currently populated — see §9. `sources refresh` bypasses the discovery-cache
+  TTL for a live re-fetch.
 
 - Each CLI command is a thin wrapper calling the same `core` services the Python
   API uses → single source of truth, DRY.
@@ -407,9 +393,28 @@ Goal: "never re-download installed models" + offline cache management.
 
 ---
 
-## 9. Model Registry Architecture
+## 9. Model Registry / Source Architecture
 
 A **searchable, versioned catalog** decoupled from any runtime.
+
+**Core principle — dynamic discovery is the source of truth; there is no
+hand-maintained catalog.** A `RegistryPort` implementation *is* a ModelDock
+**model source**: it answers "what models exist" from an external source of
+truth (ollama.com, the Hugging Face Hub, a plugin), not from a file someone
+edits. Adding a model that a supported source already exposes requires **zero
+ModelDock code changes** — no `catalog.json` edit, no `ModelSpec(...)`, no
+manual registration. When Ollama publishes `new-model`, `OllamaLibraryRegistry`
+discovers it on the next fetch; a new GGUF repo appears via the Hugging Face
+Hub API. `data/catalog.json` is an emergency offline fallback only (§below),
+never the primary source.
+
+**Provenance.** Every source stamps a human-facing label onto the specs it
+emits (`ModelSpec.source`, e.g. `"Ollama Official"`, `"Hugging Face"`,
+`"Bundled (offline fallback)"`; see `domain/source.py`). Discovery results and
+`info` carry this label so users always see where a model came from, and
+`modeldock sources` enumerates the active sources with a trust level
+(official / verified / community / bundled / custom), live-vs-static kind, and
+current model count. This is the observability/trust requirement made concrete.
 
 - **Dynamic catalog** (`adapters/registry/ollama_library.py`): scrapes
   `ollama.com/library` for the full model list. Auto-detects `Category` and
@@ -421,8 +426,14 @@ A **searchable, versioned catalog** decoupled from any runtime.
   variants[{tag, params, size_bytes, min_ram}], description, backend_hints`.
   Used as offline fallback when `catalog_source="bundled"` or when the
   dynamic catalog fails and no cache exists.
-- **`RegistryPort`** abstraction: `search(query)`, `get(ref)`,
-  `by_category(cat)`, `recommend(task)`, `list_all()`.
+- **`RegistryPort`** abstraction (the model-source interface): `search(query)`,
+  `get(ref)`, `resolve(ref)` (friendly name → canonical identity; an explicit
+  alias of `get`), `versions(ref)` (known version tags for a model),
+  `by_category(cat)`, `recommend(task)`, `list_all()`. Concrete sources also
+  expose `describe() -> list[SourceInfo]` (self-description for `modeldock
+  sources`) and, for live sources, `refresh()` (force a re-fetch, bypassing the
+  discovery-cache TTL). `SourceInfo` (`domain/source.py`) is pure data —
+  name, trust, live/static, backend, model count, cache path.
 - **`CachedCatalogRegistry`** (`adapters/registry/base.py`): the shared
   fetch → cache → index pipeline behind every live catalog source.
   Subclasses implement only `_fetch_from_network()` (reach the source, parse
@@ -599,11 +610,14 @@ Two complementary mechanisms:
    `after_install`, `on_error`) allow user-supplied callbacks/plugins (e.g.,
    notify on download complete, custom verification).
 
-4. **Catalog-provider plugins:** live catalog sources use the identical
+4. **Model-source plugins:** live catalog sources use the identical
    entry-point pattern as runtimes, via `CatalogProviderRegistry`
-   (`adapters/registry/catalog_registry.py`):
+   (`adapters/registry/catalog_registry.py`). The preferred group name is
+   `modeldock.model_sources` (a source *is* a model source); the original
+   `modeldock.catalog_providers` name is still scanned for backward
+   compatibility, so existing plugins keep working:
    ```
-   [project.entry-points."modeldock.catalog_providers"]
+   [project.entry-points."modeldock.model_sources"]
    vllm = "modeldock_vllm.catalog:build_catalog"
    ```
    The entry point resolves to a callable `(cache_dir: Path) -> RegistryPort`

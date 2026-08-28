@@ -9,7 +9,7 @@ Architecture.md §5.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, List, Optional, cast
 
 from modeldock.adapters.downloaders.factory import needs_http_download
 from modeldock.adapters.downloaders.http import HttpDownloader
@@ -35,6 +35,7 @@ from modeldock.domain.model import (
     ModelSpec,
     RuntimeBackend,
 )
+from modeldock.domain.source import SourceInfo, SourceTrust
 from modeldock.ports.cache import CachePort
 from modeldock.ports.events import EventPort
 from modeldock.ports.registry import RegistryPort
@@ -231,6 +232,61 @@ class ModelManager:
     def recommend(self, task: str) -> List[Any]:
         """Recommend models for a task."""
         return self._registry.recommend(task)
+
+    def resolve(self, name: str) -> ModelSpec:
+        """Resolve a friendly name/alias to its canonical catalog spec.
+
+        Surfaces the "friendly name → canonical identity" step of the
+        discovery flow, including which source the model came from
+        (``spec.source``). Raises ``ModelNotFoundError`` when unknown.
+        """
+        resolver = getattr(self._registry_port, "resolve", self._registry_port.get)
+        return resolver(ModelRef.parse(name))
+
+    def versions(self, name: str) -> List[str]:
+        """Return the known version tags a source exposes for ``name``."""
+        ref = ModelRef.parse(name)
+        versions = getattr(self._registry_port, "versions", None)
+        if callable(versions):
+            return cast(List[str], versions(ref))
+        try:
+            return self._registry_port.get(ref).version_tags()
+        except ModelNotFoundError:
+            return []
+
+    # --- sources / observability ----------------------------------------
+
+    def sources(self) -> List[SourceInfo]:
+        """Describe the active model sources feeding discovery.
+
+        Backs ``modeldock sources``. Reports every source in the resolved
+        registry (a ``CompositeRegistry`` fans out to its members) so users
+        can see where discovered models come from and whether each source is
+        currently populated.
+        """
+        describe = getattr(self._registry_port, "describe", None)
+        if callable(describe):
+            return list(describe())
+        # A source predating the describe() contract still counts as one source.
+        return [
+            SourceInfo(
+                name=type(self._registry_port).__name__,
+                trust=SourceTrust.CUSTOM,
+                live=True,
+                model_count=len(self._registry_port.list_all()),
+            )
+        ]
+
+    def refresh_sources(self) -> List[SourceInfo]:
+        """Force each live source to re-fetch, bypassing its cache TTL.
+
+        Backs ``modeldock sources refresh``. Returns the post-refresh source
+        descriptors so callers can report the new model counts.
+        """
+        refresh = getattr(self._registry_port, "refresh", None)
+        if callable(refresh):
+            refresh()
+        return self.sources()
 
     # --- lifecycle ------------------------------------------------------
 

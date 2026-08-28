@@ -92,6 +92,21 @@ def recommend(task: str) -> List[Any]:
     return _manager().recommend(task)
 
 
+def resolve(name: str) -> Any:
+    """Resolve a friendly name/alias to its canonical spec (with provenance)."""
+    return _manager().resolve(name)
+
+
+def versions(name: str) -> List[str]:
+    """Known version tags a source exposes for a model."""
+    return _manager().versions(name)
+
+
+def sources() -> List[Any]:
+    """Describe the active model sources feeding discovery."""
+    return _manager().sources()
+
+
 def install(name: str, backend: Optional[str] = None) -> ModelRef:
     """Explicit download."""
     if backend is not None:
@@ -205,6 +220,9 @@ __all__ = [
     "info",
     "categories",
     "recommend",
+    "resolve",
+    "versions",
+    "sources",
     "install",
     "install_category",
     "suggest_category",

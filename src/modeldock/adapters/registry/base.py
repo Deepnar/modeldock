@@ -17,7 +17,15 @@ from typing import Any, Dict, List, Optional
 
 from modeldock.common.errors import ModelNotFoundError
 from modeldock.common.logging import get_logger
-from modeldock.domain.model import Capability, Category, ModelAlias, ModelRef, ModelSpec
+from modeldock.domain.model import (
+    Capability,
+    Category,
+    ModelAlias,
+    ModelRef,
+    ModelSpec,
+    RuntimeBackend,
+)
+from modeldock.domain.source import SourceInfo, SourceTrust
 
 
 class CachedCatalogRegistry(abc.ABC):
@@ -29,9 +37,21 @@ class CachedCatalogRegistry(abc.ABC):
     query methods, so those never need to be reimplemented per source.
     """
 
-    def __init__(self, cache_dir: Path, cache_filename: str, logger_name: str) -> None:
+    def __init__(
+        self,
+        cache_dir: Path,
+        cache_filename: str,
+        logger_name: str,
+        *,
+        source_name: str,
+        source_trust: SourceTrust,
+        source_backend: Optional[RuntimeBackend] = None,
+    ) -> None:
         self._logger = get_logger(logger_name)
         self._cache_path = cache_dir / cache_filename
+        self._source_name = source_name
+        self._source_trust = source_trust
+        self._source_backend = source_backend
         self._specs: Dict[str, ModelSpec] = {}
         self._by_alias: Dict[str, str] = {}
         self._load()
@@ -51,9 +71,29 @@ class CachedCatalogRegistry(abc.ABC):
             return
         self._build_index(models)
 
+    def refresh(self) -> int:
+        """Force a live re-fetch, bypassing the cache TTL; return model count.
+
+        Backs ``modeldock sources refresh``. A failed fetch leaves the current
+        index untouched rather than emptying it, so a refresh can never make
+        discovery worse than it already was.
+        """
+        models = self._fetch_from_network()
+        if models is None:
+            self._logger.info("Refresh found no network source; keeping existing index")
+            return len(self._specs)
+        self._specs.clear()
+        self._by_alias.clear()
+        self._build_index(models)
+        return len(self._specs)
+
     def _build_index(self, models: List[Dict[str, Any]]) -> None:
         for raw in models:
             spec = self._to_spec(raw)
+            # Stamp provenance once, centrally, so every source gets it without
+            # each ``_to_spec`` re-implementing it.
+            if spec.source is None:
+                spec.source = self._source_name
             self._specs[spec.name] = spec
             for alias in spec.aliases:
                 self._by_alias[alias.lower()] = spec.name
@@ -86,6 +126,35 @@ class CachedCatalogRegistry(abc.ABC):
         if name is None:
             raise ModelNotFoundError(ref.name)
         return self._specs[name]
+
+    def resolve(self, ref: ModelRef) -> ModelSpec:
+        """Resolve a friendly/alias ``ref`` to its canonical spec.
+
+        Same resolution as :meth:`get`; named separately to make the
+        source-interface intent explicit (alias → canonical identity).
+        """
+        return self.get(ref)
+
+    def versions(self, ref: ModelRef) -> List[str]:
+        """Return known version tags for ``ref`` (empty when unknown)."""
+        try:
+            return self.get(ref).version_tags()
+        except ModelNotFoundError:
+            return []
+
+    def describe(self) -> List[SourceInfo]:
+        """Describe this source for observability (``modeldock sources``)."""
+        return [
+            SourceInfo(
+                name=self._source_name,
+                trust=self._source_trust,
+                live=True,
+                backend=self._source_backend,
+                model_count=len(self._specs),
+                cache_path=str(self._cache_path),
+                available=bool(self._specs),
+            )
+        ]
 
     def by_category(self, category: Category) -> List[ModelSpec]:
         """Return all specs in a category."""
