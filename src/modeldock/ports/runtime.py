@@ -21,7 +21,17 @@ from modeldock.domain.model import (
 
 @runtime_checkable
 class RuntimePort(Protocol):
-    """Abstraction over a local model runtime (Ollama, LM Studio, ...)."""
+    """Abstraction over a local model runtime (Ollama, LM Studio, ...).
+
+    Security Note
+    -------------
+    Data flowing through this port originates from external runtime processes
+    and HTTP APIs.  It is **untrusted by definition** and may contain
+    prompt-injection payloads or adversarial strings.  Implementations must
+    validate and sanitise all responses before constructing domain objects.
+    Consumers must never execute, ``eval()``, or otherwise treat port output
+    as trusted instructions.  See SECURITY.md for full guidance.
+    """
 
     @property
     def backend(self) -> RuntimeBackend:
