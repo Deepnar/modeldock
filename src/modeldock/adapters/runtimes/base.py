@@ -54,6 +54,15 @@ class BaseRuntime:
     """Mixin/base providing shared RuntimePort behavior.
 
     Concrete runtimes subclass this and implement the ``_``-prefixed hooks.
+
+    Security Note
+    -------------
+    All data received from runtime APIs (HTTP responses, SDK return values)
+    crosses a trust boundary and is **untrusted by definition**.  Concrete
+    adapters must validate and sanitise responses before constructing domain
+    objects.  Never pass raw runtime output to ``exec()``, ``eval()``,
+    ``subprocess``, or any code-execution primitive.  See SECURITY.md for
+    the full prompt-injection guidance.
     """
 
     backend: RuntimeBackend = RuntimeBackend.OLLAMA

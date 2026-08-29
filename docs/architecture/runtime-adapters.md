@@ -102,6 +102,27 @@ A `RuntimeRegistry` maps `RuntimeBackend` → factory. Discovered via entry poin
 
 ---
 
+## Security: Trust Boundaries
+
+All data returned by runtime APIs (HTTP responses, SDK return values) crosses
+a **trust boundary** and is untrusted by definition. When implementing or
+extending a runtime adapter, keep the following in mind:
+
+- **Validate before constructing domain objects.** Parse responses defensively;
+  do not assume well-formed data.
+- **Never execute adapter output.** Do not pass response data to `exec()`,
+  `eval()`, `subprocess`, or any code-execution primitive.
+- **Sanitise before surfacing.** If adapter output is displayed in a terminal,
+  HTML page, or log, escape it to prevent injection (e.g., terminal escape
+  sequences, XSS).
+- **Prompt-injection risk.** Model output may contain payloads designed to
+  mislead downstream tooling in agent/copilot pipelines. Treat it as
+  adversarial user input.
+
+See [SECURITY.md](../../SECURITY.md) for the full prompt-injection guidance.
+
+---
+
 ## Next Steps
 
 - [Catalog Provider Registry](catalog-provider-registry.md) — the parallel mechanism for live model catalogs
