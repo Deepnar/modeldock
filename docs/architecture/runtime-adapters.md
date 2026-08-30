@@ -119,8 +119,7 @@ extending a runtime adapter, keep the following in mind:
   mislead downstream tooling in agent/copilot pipelines. Treat it as
   adversarial user input.
 
-See [SECURITY.md](../../SECURITY.md) for the full prompt-injection guidance.
-
+See [SECURITY.md](https://github.com/OpenAgentHQ/modeldock/blob/main/SECURITY.md) for the full prompt-injection guidance.
 ---
 
 ## Next Steps
