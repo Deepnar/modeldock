@@ -31,7 +31,7 @@ class Gpt4AllRuntime(BaseRuntime):
         if not self._models_dir.is_dir():
             return []
         refs: List[ModelRef] = []
-        for path in sorted(self._models_dir.iterdir()):
+        for path in sorted(self._models_dir.iterdir(), key=lambda path: path.name):
             if path.is_file() and path.suffix.lower() in {".gguf", ".bin"}:
                 refs.append(ModelRef.parse(path.stem))
         return refs
